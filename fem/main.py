@@ -106,11 +106,8 @@ class CahnHilliardSolver():
 
         self.x = np.linspace(0, L, self.__N)
     
-    
-    def l2g_map(self,e,n):
-        return self.element.degree*e + n
         
-    def solve(self, u0, T:float, dt:float, time_integrator:str|int = 'explicit', non_linear_solver:str|int = 'picard'):
+    def solve_transient(self, u0, T:float, dt:float, time_integrator:str|int = 'explicit', non_linear_solver:str|int = 'picard'):
         
         self.__dt = dt
         self.__t = np.arange(0, T+dt, dt)
@@ -174,7 +171,12 @@ class CahnHilliardSolver():
             print('\n')
         
         return self.__u
-    
+
+
+
+    ####################################################################
+    # AUXILIARY FUNCTIONS
+
     def __assemble_M(self):
         """Assemble Mass Matrix"""
         M = np.zeros((self.__N, self.__N), dtype= float)
@@ -185,7 +187,6 @@ class CahnHilliardSolver():
             he = self.x[self.l2g_map(e, self.element.degree)] - self.x[self.l2g_map(e, 0)]
             M[i:i+self.element.n, i:i+self.element.n] += self.element.Me(he)
         return M
-    
     
     def __assemble_InvM(self):
         """Assemble the inverse of the Mass Matrix"""
@@ -209,15 +210,16 @@ class CahnHilliardSolver():
             K[i:i+self.element.n, i:i+self.element.n] += self.element.Ke(he)
         return K
     
-    def __assemble_N(self, evaluation_c):
+    def __assemble_N(self, evaluation_C):
         """Assemble non-linear mass matrix"""
-        N = np.zeros((self.__N, self.__N), dtype=float)
+        N = np.zeros((self.__N,), dtype=float)
         for e in range(self.__ne):
             i = e*self.element.degree
             he = self.x[self.l2g_map(e, self.element.degree)] - self.x[self.l2g_map(e, 0)]
-            N[i:i+self.element.n, i:i+self.element.n] = self.element.Ne(he, evaluation_c[i:i+self.element.n])
+            N[i:i+self.element.n] += self.element.Ne(he, evaluation_C[i:i+self.element.n])
         return N
-        
+
+
     @staticmethod
     def _step(self, ):
         """Step solution in time"""
@@ -227,6 +229,16 @@ class CahnHilliardSolver():
     def _nl_solver(self,):
         """Non linear solver"""
         pass
+
+
+
+    #######################################################
+    # HELPER FUNCTIONS
+    def l2g_map(self,e,n):
+        return self.element.degree*e + n
+
+
+
 
     ######################################################
     # PROPERTIES
@@ -279,7 +291,7 @@ if __name__ == '__main__':
 
     # Initial conditions
     def c0(x): return np.cos(np.pi*x)
-    def c0(x): return np.sin(np.pi/(2*L)*x)
+    def c0(x): return np.sin(np.pi/(L)*x)
 
     # Nonlinear solver
 
@@ -287,13 +299,12 @@ if __name__ == '__main__':
     sol = CahnHilliardSolver(epsilon, 
                              number_of_elements=N, L = L, 
                              polynomial_order=1)
-    sol.solve(c0, tEnd, dt)
-
+    sol.solve_transient(c0, tEnd, dt)
+    
 
     import matplotlib.pyplot as plt
-    print(sol.nt)
-    plt.plot(sol.x, c0(sol.x))
-    for i in range(sol.nt):
-        plt.plot(sol.x, sol.sol_c[i])
     
+    plt.plot(sol.x, c0(sol.x))
+    for i in range(1, sol.nt):
+        plt.plot(sol.x, sol.sol_c[i])
     plt.show()

@@ -1,6 +1,5 @@
 import numpy as np
 
-
 GAUSS_QUADRATURE_POINTS = {1: 0,
                            2: [-1/np.sqrt(3), 1/np.sqrt(3)],
                            3: [-np.sqrt(3/5), 0, np.sqrt(3/5)],
@@ -16,7 +15,7 @@ GAUSS_QUADRATURE_WEIGHTS = {1: 2,
 
 
 def quadrature(f, n):
-    f = 0
-    for xi, wi in zip(GAUSS_QUADRATURE_POINTS[n], GAUSS_QUADRATURE_WEIGHTS[n]):
-        f += wi*f(xi)
-    return f
+    I = 0
+    for xi, wi in zip(*np.polynomial.legendre.leggauss(n)):
+        I += wi*f(xi)
+    return I

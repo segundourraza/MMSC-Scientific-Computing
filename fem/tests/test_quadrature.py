@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
-from .._quadrature import GAUSS_QUADRATURE_POINTS, GAUSS_QUADRATURE_WEIGHTS, quadrature
+
+from fem._quadrature import quadrature
 
 class TestGaussLegendreQuadrature(unittest.TestCase):
 
@@ -44,7 +45,7 @@ class TestGaussLegendreQuadrature(unittest.TestCase):
 
     def test_convergence_smooth_function(self):
         """Error should decrease with increasing n"""
-        f = np.exp
+        f = lambda x: np.exp(x)
         exact = np.e - 1 / np.e
 
         errors = []
