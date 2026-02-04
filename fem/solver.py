@@ -1,6 +1,6 @@
 import numpy as np
+import scipy.linalg as linalg
 np.set_printoptions(linewidth = 240)
-from _quadrature import quadrature, GAUSS_QUADRATURE_POINTS, GAUSS_QUADRATURE_WEIGHTS
 
 ############################################################################
 # BASIS FUNCTIONS
@@ -18,6 +18,7 @@ class LinearElement1D:
     
     # Quadrature points
     r_Ne:int = 2
+    r_J: int = 3
 
 
     @staticmethod
@@ -25,37 +26,41 @@ class LinearElement1D:
         return [_(xi) for _ in linear_basis_functions]
     
     @staticmethod
+    def grad_basis_functions(xi):
+        return [_(xi) for _ in grad_linear_basis_functions]
+    
+    @staticmethod
     def Me(he):
         return he/6*np.array([[2,1],[1,2]], dtype=float)
     
     @staticmethod
     def Ke(he):
-        return 2/he * np.array([[1, -1], [-1, 1]], dtype=float)
-    
-    @staticmethod
-    def InvMe(he):
-        return 2/he*np.array([[2, -1],[-1,2]], dtype=float)
-    
+        return 1/he * np.array([[1, -1], [-1, 1]], dtype=float)
+
     def Ne(self, he, Ce):
-        Ne = np.empty((self.n, self.n))
-        for xi,wi in zip(GAUSS_QUADRATURE_POINTS[self.r_Ne], GAUSS_QUADRATURE_WEIGHTS[self.r_Ne]):
-            phi0, phi1 = self.basis_functions(xi)
-            ch2 = (Ce[0]*phi0 + Ce[1]*phi1)**2
-            for i in range(self.n):
-                for j in range(self.n):
-                    Ne[i,j] += ch2*phi0*phi1*he/2*wi
-        return Ne
-
-    def Fnle(self, he, C0):
-        Fnl = np.empty((self.n,))
-        for xi,wi in zip(GAUSS_QUADRATURE_POINTS[self.r_Ne], GAUSS_QUADRATURE_WEIGHTS[self.r_Ne]):
+        Ne = np.zeros((self.n))
+        for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
             phi = self.basis_functions(xi)
-            ch = (C0[0]*phi[0] + C0[1]*phi[1])
-            fprime = ch**3 - ch
+            ch = Ce[0]*phi[0] + Ce[1]*phi[1]
+            ch3 = (ch)**3
             for i in range(self.n):
-                Fnl[i] += wi*fprime*phi[i]*(he/2)
-        return Fnl
+                Ne[i] += (ch3 - ch)*phi[i]*he/2*wi
+        return Ne
+    
 
+    def compute_mass_e(self, he, Ce):
+        return he/2*(Ce[0] + Ce[1])
+    
+    def compute_J_e(self, eps, he, Ce):
+        J = 0
+        for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_J)):
+            phi = self.basis_functions(xi)
+            grad_phi = self.grad_basis_functions(xi)
+            ch = Ce[0]*phi[0] + Ce[1]*phi[1]
+            grad_ch = Ce[0]*grad_phi[0] + Ce[1]*grad_phi[1]
+            J += wi*((1 - ch**2)**2/(4*eps)  + eps/2 * (grad_ch)**2)
+        return J*he/2
+        
 
 ELEMENT_MAP = {1: LinearElement1D()}
 
@@ -105,7 +110,11 @@ class CahnHilliardSolver():
 
 
         self.x = np.linspace(0, L, self.__N)
-    
+
+        # Evaluate 'Mass' and 'Stiffness' matrix. These DO NOT change with time or value of C
+        self.M = self.__assemble_M()
+        self.K = self.__assemble_K()
+        
         
     def solve_transient(self, u0, T:float, dt:float, time_integrator:str|int = 'explicit', non_linear_solver:str|int = 'picard'):
         
@@ -121,55 +130,57 @@ class CahnHilliardSolver():
             non_linear_solver = NL_SOLVER_STRING2INT_MAP[non_linear_solver]
         self._nl_solver = NL_SOLVER_MAP[non_linear_solver]
 
-
-        
-        # Evaluate 'Mass' and 'Stiffness' matrix. These DO NOT change with time or value of C
-        M = self.__assemble_M()
-        invM = self.__assemble_InvM()
-        K = self.__assemble_K()
-
-
         # Solution vector u = [C , W]
         self.__u = np.empty((self.__nt, 2*self.__N), dtype=float)
+        self.__mass = np.empty((self.__nt,), dtype=float)
+        self.__J = np.empty((self.__nt,), dtype=float)
         if callable(u0):
             self.__u[0][:self.__N] = u0(self.x)
         elif len(u0) == self.__N:
             self.__u[0][:self.__N] = u0
-        
-        
-
+        self.__mass[0] = self.__compute_mass(self.__u[0])
+        self.__J[0] = self.__compute_J(self.__u[0])
 
         ################################################
         # EXPLICIT EULER
-        a = 1/self.epsilon
-        invMK = invM @ K
-
-
+        
+        # Precompute LU factorisation of Mass matrix        
+        lu, piv = linalg.lu_factor(self.M)
+        
         # Explicit Euler Requires the computation of W[0] via the variational problem
-        Fnl = np.zeros((self.__N,))
-        for e in range(self.__ne):
-            i = e*self.element.degree
-            he = self.x[self.l2g_map(e, self.element.degree)] - self.x[self.l2g_map(e, 0)]
-            Fnl[i:i+self.element.n] += self.element.Fnle(he, self.__u[0][i:i+self.element.n])
-        self.__u[0][self.N:] = self.epsilon*invMK@self.__u[0][:self.N] + 1/self.epsilon*Fnl
-
+        N0 = self.__assemble_N(self.__u[0,:self.__N])
+        b = self.epsilon*(self.K@self.__u[0,:self.__N]) + 1/self.epsilon * N0
+        self.__u[0,self.N:] = linalg.lu_solve((lu, piv), b)
         
-
         for it in range(1,self.__nt):
-            Ci = self.__u[it-1][:self.__N]
             Wi = self.__u[it-1][self.__N:]
-            
-            N = self.__assemble_N(Ci)
-            # Compute RHS vector
-            f = -a*Ci  + self.epsilon*(invMK@Ci) + a*(invM@(N@Ci))
-
-            # Compute new C^{i+1}
-            self.__u[it][:self.N] = Ci - dt*invMK@Wi
-            self.__u[it][self.N:] = f
-
-            print(self.__u[it])
-            print('\n')
         
+            # First Propagate C
+            fc = self.M@self.__u[it-1][:self.__N] - self.__dt*(self.K@Wi)
+            self.__u[it][:self.N] = linalg.lu_solve((lu, piv), fc)
+            
+            # Secondly propagate W with new values of C
+            N = self.__assemble_N(self.__u[it][:self.__N])
+            fw = self.epsilon*(self.K@self.__u[it][:self.__N]) + 1/self.epsilon*N
+            self.__u[it][self.N:] = linalg.lu_solve((lu, piv), fw)
+            
+            # Compute Conserved quantities
+            self.__mass[it] = self.__compute_mass(self.__u[it])
+            self.__J[it] = self.__compute_J(self.__u[it])
+
+            if not np.isclose(self.__mass[it], self.__mass[it-1]):
+                print("\n\nMASS IS NOT BEING CONSERVED!!!!!!!!!!!!!!!!!!")
+                print(self.__mass[it-1], self.__mass[it])
+                return self.__u[:it-1,:]
+            
+            if (self.__J[it]-self.__J[it-1])/self.__J[it-1] > 0.05:
+                print("\n\nJ INCREASING!!!!!!!!!!!!!!!!!!")
+                print(self.__J[it-1], self.__J[it], )
+                return self.__u[:it-1,:]
+            
+            print(self.__mass[it])
+            print(self.__J[it])
+            print()        
         return self.__u
 
 
@@ -184,21 +195,10 @@ class CahnHilliardSolver():
         for e in range(self.__ne):
             # Classic overlapping block assembly
             i = e*self.element.degree
-            he = self.x[self.l2g_map(e, self.element.degree)] - self.x[self.l2g_map(e, 0)]
+            he = self.x[i+self.element.n-1] - self.x[i]
             M[i:i+self.element.n, i:i+self.element.n] += self.element.Me(he)
         return M
     
-    def __assemble_InvM(self):
-        """Assemble the inverse of the Mass Matrix"""
-        InvM = np.zeros((self.__N, self.__N), dtype= float)
-        # Loop over elements
-        for e in range(self.__ne):
-            # Classic overlapping block assembly
-            i = e*self.element.degree
-            he = self.x[self.l2g_map(e, self.element.degree)] - self.x[self.l2g_map(e, 0)]
-            InvM[i:i+self.element.n, i:i+self.element.n] += self.element.InvMe(he)
-        return InvM
-
     def __assemble_K(self):
         """Assemble Stiffness Matrix"""
         K = np.zeros((self.__N, self.__N), dtype= float)
@@ -206,7 +206,7 @@ class CahnHilliardSolver():
         for e in range(self.__ne):
             # Classic overlapping block assembly
             i = e*self.element.degree
-            he = self.x[self.l2g_map(e, self.element.degree)] - self.x[self.l2g_map(e, 0)]
+            he = self.x[i+self.element.n-1] - self.x[i]
             K[i:i+self.element.n, i:i+self.element.n] += self.element.Ke(he)
         return K
     
@@ -215,11 +215,27 @@ class CahnHilliardSolver():
         N = np.zeros((self.__N,), dtype=float)
         for e in range(self.__ne):
             i = e*self.element.degree
-            he = self.x[self.l2g_map(e, self.element.degree)] - self.x[self.l2g_map(e, 0)]
+            he = self.x[i+self.element.n-1] - self.x[i]
             N[i:i+self.element.n] += self.element.Ne(he, evaluation_C[i:i+self.element.n])
         return N
+    
 
-
+    def __compute_mass(self, u):
+        M = 0
+        for e in range(self.__ne):
+            i = e*self.element.degree
+            he = self.x[i+self.element.n-1] - self.x[i]
+            M += self.element.compute_mass_e(he, u[i:i+self.element.n])
+        return M
+    
+    def __compute_J(self, u):
+        J = 0    
+        for e in range(self.__ne):
+            i = e*self.element.degree
+            he = self.x[i+self.element.n-1] - self.x[i]
+            J += self.element.compute_J_e(self.epsilon, he, u[i:i+self.element.n])
+        return J
+    
     @staticmethod
     def _step(self, ):
         """Step solution in time"""
@@ -273,38 +289,14 @@ class CahnHilliardSolver():
     def sol_w(self):
         """solution of w"""
         return self.__u[:,self.__N:]
-
-
-if __name__ == '__main__':
-
-    # Physics
-    dt = 1e-4
-    tEnd = dt*3
-    epsilon = 0.01
-
-    # Discretization
-    L = 1
-    N = 10
-    poly_degree = 1
     
-
-
-    # Initial conditions
-    def c0(x): return np.cos(np.pi*x)
-    def c0(x): return np.sin(np.pi/(L)*x)
-
-    # Nonlinear solver
-
-
-    sol = CahnHilliardSolver(epsilon, 
-                             number_of_elements=N, L = L, 
-                             polynomial_order=1)
-    sol.solve_transient(c0, tEnd, dt)
+    @property
+    def mass(self):
+        """Mass"""
+        return self.__mass
     
-
-    import matplotlib.pyplot as plt
     
-    plt.plot(sol.x, c0(sol.x))
-    for i in range(1, sol.nt):
-        plt.plot(sol.x, sol.sol_c[i])
-    plt.show()
+    @property
+    def J(self):
+        """J integrals"""
+        return self.__J
