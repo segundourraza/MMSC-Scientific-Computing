@@ -124,46 +124,41 @@ class CahnHilliardSolver():
 
         if isinstance(time_integrator, str):
             time_integrator = TIME_INTEGRATOR_STRING2INT_MAP[time_integrator]
-        self._step = TIME_INTEGRATOR_MAP[time_integrator]
+        _step = TIME_INTEGRATOR_MAP[time_integrator]
 
         if isinstance(non_linear_solver, str):
             non_linear_solver = NL_SOLVER_STRING2INT_MAP[non_linear_solver]
         self._nl_solver = NL_SOLVER_MAP[non_linear_solver]
 
-        # Solution vector u = [C , W]
+        # CONSTRUCT SOLUTION VECTOR U = [C , W]
         self.__u = np.empty((self.__nt, 2*self.__N), dtype=float)
-        self.__mass = np.empty((self.__nt,), dtype=float)
-        self.__J = np.empty((self.__nt,), dtype=float)
         if callable(u0):
             self.__u[0][:self.__N] = u0(self.x)
         elif len(u0) == self.__N:
             self.__u[0][:self.__N] = u0
+        
+        # Computation of W[0] via the variational problem
+        N0 = self.__assemble_N(self.__u[0,:self.__N])
+        b = self.epsilon*(self.K@self.__u[0,:self.__N]) + 1/self.epsilon * N0
+        self.__u[0,self.N:] = linalg.solve(self.M, b)
+        
+        # CONSERVED QUANTITIES
+        self.__mass = np.empty((self.__nt,), dtype=float)
+        self.__J = np.empty((self.__nt,), dtype=float)
         self.__mass[0] = self.__compute_mass(self.__u[0])
         self.__J[0] = self.__compute_J(self.__u[0])
 
         ################################################
-        # EXPLICIT EULER
+        # TIME STEPPING
         
-        # Precompute LU factorisation of Mass matrix        
+        # Precompute LU factorisation of Mass matrix
         lu, piv = linalg.lu_factor(self.M)
         
-        # Explicit Euler Requires the computation of W[0] via the variational problem
-        N0 = self.__assemble_N(self.__u[0,:self.__N])
-        b = self.epsilon*(self.K@self.__u[0,:self.__N]) + 1/self.epsilon * N0
-        self.__u[0,self.N:] = linalg.lu_solve((lu, piv), b)
         
         for it in range(1,self.__nt):
-            Wi = self.__u[it-1][self.__N:]
-        
-            # First Propagate C
-            fc = self.M@self.__u[it-1][:self.__N] - self.__dt*(self.K@Wi)
-            self.__u[it][:self.N] = linalg.lu_solve((lu, piv), fc)
             
-            # Secondly propagate W with new values of C
-            N = self.__assemble_N(self.__u[it][:self.__N])
-            fw = self.epsilon*(self.K@self.__u[it][:self.__N]) + 1/self.epsilon*N
-            self.__u[it][self.N:] = linalg.lu_solve((lu, piv), fw)
-            
+            self.__u[it] = _step(self.__u[it-1], (lu, piv))
+
             # Compute Conserved quantities
             self.__mass[it] = self.__compute_mass(self.__u[it])
             self.__J[it] = self.__compute_J(self.__u[it])
@@ -186,8 +181,7 @@ class CahnHilliardSolver():
 
 
     ####################################################################
-    # AUXILIARY FUNCTIONS
-
+    # ASSEMBLE GLOBAL LINEAR SYSTEMS
     def __assemble_M(self):
         """Assemble Mass Matrix"""
         M = np.zeros((self.__N, self.__N), dtype= float)
@@ -220,6 +214,8 @@ class CahnHilliardSolver():
         return N
     
 
+    ####################################################################
+    # AUXILIARY FUNCTIONS
     def __compute_mass(self, u):
         M = 0
         for e in range(self.__ne):
@@ -236,10 +232,28 @@ class CahnHilliardSolver():
             J += self.element.compute_J_e(self.epsilon, he, u[i:i+self.element.n])
         return J
     
-    @staticmethod
-    def _step(self, ):
-        """Step solution in time"""
-        pass
+
+    ########################################################################
+    # TIME STEPPING
+    def _step_explicit(self, u):
+        """Explicit time stepping"""
+        u_new = np.empty((2*self.__N,), dtype=float)
+        Wi = u[self.__N:]
+        
+        # First Propagate C
+        fc = self.M@u[:self.__N] - self.__dt*(self.K@Wi)
+        u_new[:self.N] = linalg.lu_solve((lu, piv), fc)
+        
+        # Secondly propagate W with new values of C
+        N = self.__assemble_N(u_new[:self.__N])
+        fw = self.epsilon*(self.K@u_new[:self.__N]) + 1/self.epsilon*N
+        u_new[self.N:] = linalg.lu_solve((lu, piv), fw)
+
+        return u_new
+
+
+    ########################################################################
+    # NONLINEAR SOLVER
 
     @staticmethod
     def _nl_solver(self,):
@@ -248,14 +262,7 @@ class CahnHilliardSolver():
 
 
 
-    #######################################################
-    # HELPER FUNCTIONS
-    def l2g_map(self,e,n):
-        return self.element.degree*e + n
-
-
-
-
+    
     ######################################################
     # PROPERTIES
 
