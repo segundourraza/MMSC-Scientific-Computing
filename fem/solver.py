@@ -76,7 +76,6 @@ def _explicit_time_integrator(dt, u, A, B, f):
 
 
 TIME_INTEGRATOR_STRING2INT_MAP = {'explicit': 0}
-TIME_INTEGRATOR_MAP = {0: _explicit_time_integrator}
 
 
 
@@ -124,7 +123,11 @@ class CahnHilliardSolver():
 
         if isinstance(time_integrator, str):
             time_integrator = TIME_INTEGRATOR_STRING2INT_MAP[time_integrator]
-        _step = TIME_INTEGRATOR_MAP[time_integrator]
+        match time_integrator:
+            case 0 :
+                _step = self._step_explicit
+            case _:
+                raise ValueError
 
         if isinstance(non_linear_solver, str):
             non_linear_solver = NL_SOLVER_STRING2INT_MAP[non_linear_solver]
@@ -172,10 +175,11 @@ class CahnHilliardSolver():
                 print("\n\nJ INCREASING!!!!!!!!!!!!!!!!!!")
                 print(self.__J[it-1], self.__J[it], )
                 return self.__u[:it-1,:]
-            
-            print(self.__mass[it])
-            print(self.__J[it])
-            print()        
+            if it%100 == 0:
+                print(f'{it:4}',end = '\r')
+            # print(self.__mass[it])
+            # print(self.__J[it])
+            # print()        
         return self.__u
 
 
@@ -235,19 +239,19 @@ class CahnHilliardSolver():
 
     ########################################################################
     # TIME STEPPING
-    def _step_explicit(self, u):
+    def _step_explicit(self, u, lu_piv):
         """Explicit time stepping"""
         u_new = np.empty((2*self.__N,), dtype=float)
         Wi = u[self.__N:]
         
         # First Propagate C
         fc = self.M@u[:self.__N] - self.__dt*(self.K@Wi)
-        u_new[:self.N] = linalg.lu_solve((lu, piv), fc)
+        u_new[:self.N] = linalg.lu_solve(lu_piv, fc)
         
         # Secondly propagate W with new values of C
         N = self.__assemble_N(u_new[:self.__N])
         fw = self.epsilon*(self.K@u_new[:self.__N]) + 1/self.epsilon*N
-        u_new[self.N:] = linalg.lu_solve((lu, piv), fw)
+        u_new[self.N:] = linalg.lu_solve(lu_piv, fw)
 
         return u_new
 

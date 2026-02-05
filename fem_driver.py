@@ -9,14 +9,14 @@ if __name__ == '__main__':
 
     # Discretization
     L = 1
-    N = 10
+    N = 100
     poly_degree = 1
     
     x = np.linspace(0, L, N+1)
     he = x[1] - x[0]
-    dt = he**4/10
-    tEnd = dt*2
-    tEnd = dt*1000
+    dt = he**4
+    # tEnd = dt*2
+    tEnd = dt*1e3
 
     # Initial conditions
     def c0(x): return np.cos(np.pi*x)
