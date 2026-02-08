@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     # Discretization
     L = 1.5
-    N = 50
+    N = 10
     poly_degree = 2
     
     # Explicit
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     # Implicit
     dt = 1e-4
 
-    tEnd = dt*10
+    tEnd = dt*1
     # # tEnd = dt*0
     # tEnd = 1e-3
     tEnd = 5e-3

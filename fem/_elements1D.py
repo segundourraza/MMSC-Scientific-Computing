@@ -114,17 +114,24 @@ class _LegendreElement(ABC):
 
     #################################
     # TIME STEPPING
-    def b2(self, he, Ce):
-        Ne = np.zeros((self.n,))
+    def b2_b(self, b2, he, Ce):
         for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
             phi = self.basis_functions(xi)
             ch = np.dot(Ce, phi)
             ch3 = (ch)**3
             for i in range(self.n):
-                Ne[i] += (ch3 - 3*ch)*phi[i]*(he/2)*wi
-        return Ne
+                b2[i] += (ch3 - 3*ch)*phi[i]*(he/2)*wi
+        return b2
             
-
+    def b2_c(self, he, Ce):
+        b2 = np.zeros((self.n,))
+        for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
+            phi = self.basis_functions(xi)
+            ch2 = np.dot(Ce, phi)**2
+            for i in range(self.n):
+                b2[i] += ch2*phi[i]*(he/2)*wi
+        return b2*2
+    
 
     
 class LinearLegendreElement(_LegendreElement):

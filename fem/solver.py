@@ -205,9 +205,9 @@ class CahnHilliardSolver():
     
     
     ########################################################################
-    # SEMI-IMPLICIT TIME STEPPING
+    # SEMI-IMPLICIT B TIME STEPPING
     def _semi_implicit_B(self):
-        """Semi-Implicit methods CASE B"""
+        """Semi-Implicit methods Case B"""
 
         # Used for Semi-Implicit methods B
         ck = -self.epsilon*self.K - 2/self.epsilon*self.M
@@ -233,16 +233,45 @@ class CahnHilliardSolver():
 
             if flag != 0:
                 return self.__u[:it-1,:]
+    
+    def _semi_implicit_B(self):
+        """Semi-Implicit methods Case B"""
+
+        # Used for Semi-Implicit methods B
+        ck = -self.epsilon*self.K - 2/self.epsilon*self.M
+        A = bmat([[self.M/self.__dt, self.K],
+                  [ck, self.M]], format='csc')
+        b = np.zeros((self.__N*2,))
+
+        lu = linalg.splu(A)
+        for it in range(1,self.__nt):
+            # Compute RHS
+            # b[:self.__N] = 1/self.__dt*(self.M@self.__u[it-1,:self.N])
+            # b[self.__N:] = 1/self.epsilon*self.__assemble_b2(self.__u[it-1,:self.__N])
+            self.__update_rhs_B(b, self.__u[it-1,:self.__N])
+            # Compute LHS: THis can be done once
+            
+            # SOLVE
+            self.__u[it] = lu.solve(b)
+
+            flag = self.__checks(it)
+
+            if it%100 == 0:
+                print(f'{it:4}',end = '\r')
+
+            if flag != 0:
+                return self.__u[:it-1,:]
         
-    def __assemble_b2(self, evaluation_C):
-        """Assemble non-linear mass matrix"""
-        b2 = np.zeros((self.__N,), dtype=float)
+    def __update_rhs_B(self, b, evaluation_C):
+        """Assemble non-linear vector for semi implicit B"""
+        
+        b[:self.__N] = 1/self.__dt*(self.M@evaluation_C)
+        b[self.__N:] = 0
         for e in range(self.__ne):
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
-            b2[i:i+self.element.n] += self.element.b2(he, evaluation_C[i:i+self.element.n])
-        return b2
-
+            self.element.b2_b(b[self.__N+i:self.__N+i+self.element.n], he, evaluation_C[i:i+self.element.n])    
+        b[self.__N:] *= 1/self.epsilon
 
     ########################################################################
     # NONLINEAR SOLVER
