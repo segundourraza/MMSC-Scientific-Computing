@@ -9,21 +9,27 @@ np.set_printoptions(linewidth = 240)
 if __name__ == '__main__':
 
     # Physics
-    epsilon = 0.01
 
     # Discretization
-    L = 1.5
+    L = 1
     N = 10
-    poly_degree = 2
+    N = 40
+    # N = 100
+    # N = 200
+    poly_degree = 1
     
     # Explicit
     dt = 1e-8
 
     # Implicit
     dt = 1e-4
+    
+    # Semi implicit
+    # dt = 5e-6
+    # dt = 5e-5
 
     tEnd = dt*1
-    # # tEnd = dt*0
+    # tEnd = dt*100
     # tEnd = 1e-3
     tEnd = 5e-3
     time_integrator = 2
@@ -33,17 +39,47 @@ if __name__ == '__main__':
 
 
     # Initial conditions
+    # def c0(x): return np.sin(np.pi/L*x)
     def c0(x): return np.cos(np.pi/L*x)
+    # def c0(x): return np.ones_like(x)
     # def c0(x): return np.sin(np.pi/(L)*x)
 
+    epsilon = 0.1
     # Nonlinear solver
-
-
     sol = CahnHilliardSolver(epsilon, 
                              number_of_elements=N, L = L, 
                              polynomial_order=poly_degree)
     sol.solve(c0, tEnd, dt, time_integrator=time_integrator)
 
+    # epsilon = 0.05
+    # u0 = sol.sol_c[1]
+    # tEnd = dt*1
+    # sol = CahnHilliardSolver(epsilon, 
+    #                          number_of_elements=N, L = L, 
+    #                          polynomial_order=poly_degree)
+    # sol.solve(u0, tEnd, dt, time_integrator=time_integrator)
+
+    # epsilon = 0.025
+    # u0 = sol.sol_c[1]
+    # tEnd = dt*1
+    # sol = CahnHilliardSolver(epsilon, 
+    #                          number_of_elements=N, L = L, 
+    #                          polynomial_order=poly_degree)
+    # sol.solve(u0, tEnd, dt, time_integrator=time_integrator)
+
+    # epsilon = 0.01
+    # u0 = sol.sol_c[1]
+    # tEnd = dt*10
+    # sol = CahnHilliardSolver(epsilon, 
+    #                          number_of_elements=N, L = L, 
+    #                          polynomial_order=poly_degree)
+    # sol.solve(u0, tEnd, dt, time_integrator=time_integrator)
+
+
+
+
+    ###############################################################
+    #  PLOTTING
     sol.plot_contour()
     
     fig1, ax1 = plt.subplots(1,2)
@@ -53,6 +89,20 @@ if __name__ == '__main__':
         for i in range(1,len(sol.t), max(len(sol.t)//10, 1)):
             ax1[0].plot(sol.x, sol.sol_c[i])
             ax1[1].plot(sol.x, sol.sol_w[i])
+    ax1[0].set_title('c(x)')
+    ax1[1].set_title('w(x)')
+    fig1.tight_layout()
+    [_.set_xlabel('x') for _ in ax1]
+    [_.grid() for _ in ax1]
+    
+
+    fig1, ax1 = plt.subplots(1,2)
+    ax1[0].plot(sol.sol_c[0], '.-')
+    ax1[1].plot(sol.sol_w[0], '.-')
+    if len(sol.t) > 1:
+        for i in range(1,len(sol.t), max(len(sol.t)//10, 1)):
+            ax1[0].plot(sol.sol_c[i])
+            ax1[1].plot(sol.sol_w[i])
     ax1[0].set_title('c(x)')
     ax1[1].set_title('w(x)')
     fig1.tight_layout()

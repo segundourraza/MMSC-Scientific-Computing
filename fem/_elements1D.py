@@ -71,25 +71,49 @@ class _LegendreElement(ABC):
         pass
     
 
-    def Ne(self, he, Ce):
-        Ne = np.zeros((self.n,))
+    def Ne(self, N, he, Ce):
         for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
             phi = self.basis_functions(xi)
             ch = np.dot(Ce, phi)
             ch3 = (ch)**3
             for i in range(self.n):
-                Ne[i] += (ch3 - ch)*phi[i]*(he/2)*wi
-        return Ne
+                N[i] += (ch3 - ch)*phi[i]*(he/2)*wi
     
-    def He(self, he, Ce):
-        He = np.zeros((self.n, self.n))
+    def He(self, H, he, Ce):
         for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
             phi = self.basis_functions(xi)
             ch2 = np.dot(Ce, phi)**2
-            He += np.outer(phi, phi)*(3*ch2 - 1)*(he/2)*wi
-        return He
+            # H[:] += np.outer(phi, phi)*(3*ch2)*(he/2)*wi
+            for i in range(self.n):
+                for j in range(self.n):
+                    H[i,j] += phi[i]*phi[j]*(3*ch2)*(he/2)*wi
     
 
+
+    #################################
+    # TIME STEPPING
+    def b2_b(self, b2, he, Ce):
+        for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
+            phi = self.basis_functions(xi)
+            ch = np.dot(Ce, phi)
+            ch3 = (ch)**3
+            for i in range(self.n):
+                b2[i] += (ch3 - 3*ch)*phi[i]*(he/2)*wi
+
+    def b2_c(self, b2, he, Ce):
+        for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
+            phi = self.basis_functions(xi)
+            ch3 = np.dot(Ce, phi)**3
+            for i in range(self.n):
+                b2[i] += ch3*phi[i]*(he/2)*wi
+    
+    def Awc_c(self, H, he, Ce):
+        for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
+            phi = self.basis_functions(xi)
+            ch2 = np.dot(Ce, phi)**2
+            H[:] += 3*ch2*np.outer(phi, phi)*(he/2)*wi
+
+    
     #################################
     # AUXILIARY 
     
@@ -112,28 +136,8 @@ class _LegendreElement(ABC):
         return M
     
 
-    #################################
-    # TIME STEPPING
-    def b2_b(self, b2, he, Ce):
-        for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
-            phi = self.basis_functions(xi)
-            ch = np.dot(Ce, phi)
-            ch3 = (ch)**3
-            for i in range(self.n):
-                b2[i] += (ch3 - 3*ch)*phi[i]*(he/2)*wi
-        return b2
-            
-    def b2_c(self, he, Ce):
-        b2 = np.zeros((self.n,))
-        for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
-            phi = self.basis_functions(xi)
-            ch2 = np.dot(Ce, phi)**2
-            for i in range(self.n):
-                b2[i] += ch2*phi[i]*(he/2)*wi
-        return b2*2
-    
 
-    
+
 class LinearLegendreElement(_LegendreElement):
 
     degree: int = 1
@@ -155,12 +159,12 @@ class LinearLegendreElement(_LegendreElement):
     ##################################################
     # FINITE ELEMENT DISCRETIZATION
     @staticmethod
-    def Me(he):
-        return he/6*np.array([[2,1],[1,2]], dtype=float)
+    def Me(M, he):
+        M[:] += he/6*np.array([[2,1],[1,2]], dtype=float)
     
     @staticmethod
-    def Ke(he):
-        return 1/he * np.array([[1, -1], [-1, 1]], dtype=float)
+    def Ke(K, he):
+        K[:] += 1/he * np.array([[1, -1], [-1, 1]], dtype=float)
 
     ############################################
     # AUXILIARY
@@ -190,14 +194,14 @@ class QuadraticLegendreElement(_LegendreElement):
     ##################################################
     # FINITE ELEMENT DISCRETIZATION
     @staticmethod
-    def Me(he):
-        return he/30*np.array([[ 4, 2, -1],
-                               [ 2, 16, 2],
-                               [-1, 2,  4]], dtype=float)
+    def Me(M, he):
+        M[:] += he/30*np.array([[ 4, 2, -1],
+                                [ 2, 16, 2],
+                                [-1, 2,  4]], dtype=float)
     
     @staticmethod
-    def Ke(he):
-        return 1/(3*he)*np.array([[7,  -8,  1],
-                                  [-8, 16, -8],
-                                  [1,  -8,  7]], dtype = float)
+    def Ke(K, he):
+        K[:] += 1/(3*he)*np.array([[7,  -8,  1],
+                                   [-8, 16, -8],
+                                   [1,  -8,  7]], dtype = float)
     
