@@ -9,12 +9,13 @@ np.set_printoptions(linewidth = 240)
 if __name__ == '__main__':
 
     # Physics
+    epsilon = 0.01
 
     # Discretization
     L = 1
     N = 10
     N = 40
-    # N = 100
+    N = 100
     # N = 200
     poly_degree = 1
     
@@ -22,21 +23,22 @@ if __name__ == '__main__':
     dt = 1e-8
 
     # Implicit
-    dt = 1e-4
+    dt = 1e-6
     
     # Semi implicit
-    # dt = 5e-6
-    # dt = 5e-5
+    dt = 5e-6
+    # dt = 1e-4
 
     tEnd = dt*1
-    # tEnd = dt*100
-    # tEnd = 1e-3
+    # tEnd = dt*10
     tEnd = 5e-3
-    time_integrator = 2
+    # tEnd = 5e-3
+    time_integrator = 3
     
     
+    print("Implicit time step restrictions: {:.4e}".format(4*epsilon**3))
+    print("Time step used: {:.4e}".format(dt))
     print(int(tEnd/dt))
-
 
     # Initial conditions
     # def c0(x): return np.sin(np.pi/L*x)
@@ -44,39 +46,16 @@ if __name__ == '__main__':
     # def c0(x): return np.ones_like(x)
     # def c0(x): return np.sin(np.pi/(L)*x)
 
-    epsilon = 0.1
     # Nonlinear solver
     sol = CahnHilliardSolver(epsilon, 
                              number_of_elements=N, L = L, 
                              polynomial_order=poly_degree)
-    sol.solve(c0, tEnd, dt, time_integrator=time_integrator)
-
-    # epsilon = 0.05
-    # u0 = sol.sol_c[1]
-    # tEnd = dt*1
-    # sol = CahnHilliardSolver(epsilon, 
-    #                          number_of_elements=N, L = L, 
-    #                          polynomial_order=poly_degree)
-    # sol.solve(u0, tEnd, dt, time_integrator=time_integrator)
-
-    # epsilon = 0.025
-    # u0 = sol.sol_c[1]
-    # tEnd = dt*1
-    # sol = CahnHilliardSolver(epsilon, 
-    #                          number_of_elements=N, L = L, 
-    #                          polynomial_order=poly_degree)
-    # sol.solve(u0, tEnd, dt, time_integrator=time_integrator)
-
-    # epsilon = 0.01
-    # u0 = sol.sol_c[1]
-    # tEnd = dt*10
-    # sol = CahnHilliardSolver(epsilon, 
-    #                          number_of_elements=N, L = L, 
-    #                          polynomial_order=poly_degree)
-    # sol.solve(u0, tEnd, dt, time_integrator=time_integrator)
-
-
-
+    nonlinear_solver_options = {'run_checks': False,
+                        #  'line_search': 'armijo',
+                        #  'relaxation_parameter': 0.8,
+                         'verbose' : False,
+                         }
+    sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
 
     ###############################################################
     #  PLOTTING
@@ -94,20 +73,7 @@ if __name__ == '__main__':
     fig1.tight_layout()
     [_.set_xlabel('x') for _ in ax1]
     [_.grid() for _ in ax1]
-    
 
-    fig1, ax1 = plt.subplots(1,2)
-    ax1[0].plot(sol.sol_c[0], '.-')
-    ax1[1].plot(sol.sol_w[0], '.-')
-    if len(sol.t) > 1:
-        for i in range(1,len(sol.t), max(len(sol.t)//10, 1)):
-            ax1[0].plot(sol.sol_c[i])
-            ax1[1].plot(sol.sol_w[i])
-    ax1[0].set_title('c(x)')
-    ax1[1].set_title('w(x)')
-    fig1.tight_layout()
-    [_.set_xlabel('x') for _ in ax1]
-    [_.grid() for _ in ax1]
     
 
     fig2, ax2 = plt.subplots(1,2)

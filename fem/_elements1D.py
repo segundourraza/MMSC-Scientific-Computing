@@ -83,12 +83,7 @@ class _LegendreElement(ABC):
         for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
             phi = self.basis_functions(xi)
             ch2 = np.dot(Ce, phi)**2
-            # H[:] += np.outer(phi, phi)*(3*ch2)*(he/2)*wi
-            for i in range(self.n):
-                for j in range(self.n):
-                    H[i,j] += phi[i]*phi[j]*(3*ch2)*(he/2)*wi
-    
-
+            H[:] += np.outer(phi, phi)*(3*ch2)*(he/2)*wi
 
     #################################
     # TIME STEPPING
@@ -100,12 +95,20 @@ class _LegendreElement(ABC):
             for i in range(self.n):
                 b2[i] += (ch3 - 3*ch)*phi[i]*(he/2)*wi
 
-    def b2_c(self, b2, he, Ce):
+
+    def _c1(self, b, he, Ce):
+        for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
+            phi = self.basis_functions(xi)
+            ch = np.dot(Ce, phi)
+            for i in range(self.n):
+                b[i] += ch*phi[i]*(he/2)*wi
+
+    def _c3(self, b, he, Ce):
         for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
             phi = self.basis_functions(xi)
             ch3 = np.dot(Ce, phi)**3
             for i in range(self.n):
-                b2[i] += ch3*phi[i]*(he/2)*wi
+                b[i] += ch3*phi[i]*(he/2)*wi
     
     def Awc_c(self, H, he, Ce):
         for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):

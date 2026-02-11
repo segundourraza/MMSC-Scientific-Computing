@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import warnings
 
 from tqdm import tqdm
 from scipy.sparse import csc_matrix, bmat
@@ -18,8 +19,9 @@ ELEMENT_MAP = {1: LinearLegendreElement(),
 
 TIME_INTEGRATOR_STRING2INT_MAP = {'explicit': 0, 
                                   'implicit': 1,
-                                  'b': 2, 
-                                  'c': 3,}
+                                  'a': 2,
+                                  'b': 3, 
+                                  'c': 4,}
 
 
 
@@ -40,7 +42,7 @@ class CahnHilliardSolver():
         self.K = self.__assemble_K()
         
         
-    def solve(self, u0, T:float, dt:float, time_integrator:str|int = 'explicit', non_linear_solver:str|int = 'picard'):
+    def solve(self, u0, T:float, dt:float, time_integrator:str|int = 'explicit', nonlinear_solver_options:dict = {}):
         
         self.__dt = dt
         self.__t = np.arange(0, T+dt, dt)
@@ -54,11 +56,19 @@ class CahnHilliardSolver():
             case 1:
                 _time_stepper = self._implicit
             case 2:
-                _time_stepper = self._semi_implicit_B
+                _time_stepper = self._semi_implicit_A
             case 3:
+                _time_stepper = self._semi_implicit_B
+            case 4:
                 _time_stepper = self._semi_implicit_C
             case _:
                 raise ValueError
+            
+
+        ###########
+        self.__nonlinear_solver_parameters = {k:v for k,v in nonlinear_solver_options.items() if v is not None}
+        
+
 
         # CONSTRUCT SOLUTION VECTOR U = [C , W]
         self.__u = np.zeros((self.__nt, 2*self.__N), dtype=float)
@@ -70,7 +80,7 @@ class CahnHilliardSolver():
         # Computation of W[0] via the variational problem
         N0 = self.__assemble_N(self.__u[0,:self.__N])
         b = self.epsilon*(self.K@self.__u[0,:self.__N]) + 1/self.epsilon * N0
-        # self.__u[0,self.N:] = linalg.spsolve(self.M, b)
+        self.__u[0,self.N:] = linalg.spsolve(self.M, b)
         
         # CONSERVED QUANTITIES
         self.__mass = np.empty((self.__nt,), dtype=float)
@@ -100,10 +110,10 @@ class CahnHilliardSolver():
             self.__J = self.__J[:it]
             self.__u = self.__u[:it,:]
             return 1
-        elif (self.__J[it]-self.__J[0])/self.__J[0] > 0.01:
+        elif (self.__J[it]-self.__J[it-1])/self.__J[it-1] > 0.01:
             print(f"\nERROR IN ITERATION: {it:4d}")
             print("J INCREASING!!!!!!!!!!!!!!!!!!")
-            print(self.__J[0], self.__J[it], )
+            print(self.__J[it-1], self.__J[it], )
             self.__t = self.__t[:it]
             self.__mass = self.__mass[:it]
             self.__J = self.__J[:it]
@@ -153,7 +163,6 @@ class CahnHilliardSolver():
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
             self.element.He(H[i:i+self.element.n, i:i+self.element.n], he, evaluation_C[i:i+self.element.n])
-        H -= self.M
         return csc_matrix(H)
     
     ########################################################################
@@ -193,9 +202,20 @@ class CahnHilliardSolver():
     
     def _implicit(self):
         """Implicit time stepping"""
-        # for it in tqdm(range(1,self.__nt)):
-        for it in range(1,self.__nt):
-            self.__u[it] = self._NewtonRaphson(self.__u[it-1])
+        def Residual(u_prev, u):
+            res = np.empty((2*self.__N))
+            res[:self.__N] = 1/self.__dt * (self.M@(u[:self.__N] - u_prev[:self.__N])) + self.K@u[self.__N:]
+            res[self.__N:] = self.M@u[self.__N:] - self.epsilon*(self.K@u[:self.__N]) - (1.0/self.epsilon)*self.__assemble_N(u[:self.__N])
+            return res
+        
+        def Jac(u):
+            ck = -self.epsilon*self.K - (1/self.epsilon)*self.__assemble_H(u[:self.__N])
+            ck += (1.0/self.epsilon)*self.M
+            return bmat([[self.M/self.__dt, self.K],
+                        [ck, self.M]], format = 'csc')
+
+        for it in tqdm(range(1,self.__nt)):
+            self.__u[it] = self._NewtonRaphson(self.__u[it-1], Jac, Residual, **self.__nonlinear_solver_parameters)
 
             flag = self.__checks(it)
 
@@ -203,6 +223,51 @@ class CahnHilliardSolver():
                 return self.__u[:it-1,:]
     
     
+    ########################################################################
+    # SEMI-IMPLICIT B TIME STEPPING
+    def _semi_implicit_A(self):
+        """Implicit time stepping"""
+        
+        
+        def Residual(u_prev, u):
+            res = np.zeros((self.__N*2,))
+            res[:self.__N] = 1/self.__dt * (self.M@(u[:self.__N] - u_prev[:self.__N])) + self.K@u[self.__N:]
+            res[self.__N:] = self.M@u[self.__N:] - self.epsilon*(self.K@u[:self.__N]) \
+                - (1.0/self.epsilon)*self._compute_phi1_A(u[:self.__N]) \
+                    + (1.0/self.epsilon)*self._compute_phi2_A(u[:self.__N])
+            # res[self.__N:] = self.epsilon*(self.K@u[:self.__N]) + (1.0/self.epsilon)*self._compute_phi1_A(u[:self.__N]) - (1.0/self.epsilon)*self._compute_phi2_A(u_prev[:self.__N]) - (self.M@u[self.__N:])
+            # res[self.__N:] = self.epsilon*(self.K@u[:self.__N]) + (1.0/self.epsilon)*self._compute_phi1_A(u[:self.__N]) - (1.0/self.epsilon)*self._compute_phi2_A(u_prev[:self.__N]) - (self.M@u[self.__N:])
+            return res
+
+        def Jac(u):
+            ck = -(self.epsilon)*self.K - (1.0/self.epsilon)*self.__assemble_H(u[:self.__N])
+            return bmat([[self.M/self.__dt, self.K],
+                        [ck,                self.M]], format = 'csc')
+
+        for it in range(1,self.__nt):
+            self.__u[it] = self._NewtonRaphson(self.__u[it-1], Jac, Residual, **self.__nonlinear_solver_parameters)
+            
+            flag = self.__checks(it)
+
+            if flag != 0:
+                return self.__u[:it-1,:]
+
+
+    def _compute_phi1_A(self, evaluation_C):
+        b = np.zeros((self.__N,))
+        for e in range(self.__ne):
+            i = e*self.element.degree
+            he = self.x[i+self.element.n-1] - self.x[i]
+            self.element._c3(b[i:i+self.element.n], he, evaluation_C[i:i+self.element.n])    
+        return b
+
+    def _compute_phi2_A(self, evaluation_C):
+        b = np.zeros((self.__N,))
+        for e in range(self.__ne):
+            i = e*self.element.degree
+            he = self.x[i+self.element.n-1] - self.x[i]
+            self.element._c1(b[i:i+self.element.n], he, evaluation_C[i:i+self.element.n])    
+        return b
     ########################################################################
     # SEMI-IMPLICIT B TIME STEPPING
     def _semi_implicit_B(self):
@@ -279,95 +344,28 @@ class CahnHilliardSolver():
         for e in range(self.__ne):
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
-            self.element.b2_c(b[self.__N+i:self.__N+i+self.element.n], he, evaluation_C[i:i+self.element.n])    
+            self.element._c3(b[self.__N+i:self.__N+i+self.element.n], he, evaluation_C[i:i+self.element.n])    
         b[self.__N:] *= -2/self.epsilon
         
 
     ########################################################################
     # NONLINEAR SOLVER
-    def fd_jacobian_check(self, u_prev, u, eps=1e-6):
-        Fu = self.Residual(u_prev, u)
-        J = self.Jac(u).tocsc()
+    def fd_jacobian_check(self, Residual, Jac, u_prev, u, eps=1e-6):
+        Fu = Residual(u_prev, u)
+        J = Jac(u).tocsc()
         v = np.random.randn(u.size); v /= np.linalg.norm(v)
         Jv = J.dot(v)
-        FD = (self.Residual(u_prev, u + eps*v) - Fu) / eps
+        FD = (Residual(u_prev, u + eps*v) - Fu) / eps
         res = np.linalg.norm(Jv - FD) / (np.linalg.norm(Jv) + 1e-16)
         if res < eps or np.isclose(res, eps):
             return res
         else:
             raise RuntimeError(f"Finite Difference Jacobian Check Failed. eps ({eps}) != residual ({res})")
-    
-    def Jac(self, u):
-        ck = -self.epsilon*self.K - (1/self.epsilon)*self.__assemble_H(u[:self.__N])
-        return bmat([[self.M/self.__dt, self.K],
-                     [ck, self.M]], format = 'csc')
 
-    def Residual(self, u_prev, u):
-        Rc = 1/self.__dt * (self.M@(u[:self.__N] - u_prev[:self.__N])) + self.K@u[self.__N:]
-        Rw = self.M@u[self.__N:] - self.epsilon*(self.K@u[:self.__N]) - (1.0/self.epsilon)*self.__assemble_N(u[:self.__N])
-        return np.concatenate([Rc, Rw])
-
-
-
-
-    def _NewtonRaphson_old(self, u0, tol = 1e-8, max_iter = 50, verbose = False):
-        """Newton Raphson solver"""
-        u1 = np.copy(u0)
-        error = []
-        for i in range(max_iter):
-            # Compute Residuals
-            Rc = 1/self.__dt * (self.M@(u1[:self.__N] - u0[:self.__N])) + self.K@u1[self.__N:]
-            Rw = self.M@u1[self.__N:] - self.epsilon*(self.K@u1[:self.__N]) - 1/self.epsilon*self.__assemble_N(u1[:self.__N])
-            # Rw = self.M@u1[self.__N:] - self.epsilon**2*(self.K@u1[:self.__N]) - self.__assemble_N(u1[:self.__N])
-            
-            # Compute Jacobian and LHS
-            J = self.Jac(u1)
-            b = np.concatenate([Rc, Rw])
-            
-            # Solve system
-            du = linalg.spsolve(J, -b)
-            
-            # Update u
-            u1 += du
-            
-            test = np.linalg.norm(b)            
-            error.append(test)
-            if verbose:
-                print('\niteration:', i)
-                print('\t', u1[:self.__N])
-                print('\t', u1[self.__N:])
-                print()
-                print('\t',Rc)
-                print('\t',Rw)
-                print()
-                print('\t',du[:self.__N])
-                print('\t',du[self.__N:])
-                print()
-                if i == 0:
-                    print(f'\ttest: {test:.4e}')
-                else:
-                    print(f'\ttest: {test:.4e}', f'\tRate of Convergence: {test/old_test**2:.1e}')
-            if test < tol:
-                error = np.array(error)
-                plt.plot(range(i+1), np.log(error))
-                idx = np.arange(i-5, i+1, dtype=int)
-                print(np.polyfit(idx, np.log(error[idx]), 1)[0])
-                plt.show()        
-                self.fd_jacobian_check(u1)
-                return u1
-            old_test = test
-            
-        else:
-            # error = np.array(error)
-            # plt.plot(range(i+1), np.log(error))
-            # idx = np.arange(i-5, i+1)
-            # print(np.polyfit(idx, np.log(error[idx]), 1)[0])
-            # plt.show()        
-            
-            raise RuntimeError("Newton-Rapshon failed to converge")
-
-
-    def _NewtonRaphson(self, u_prev, tol = 1e-8, max_iter = 100, verbose = True, run_checks = False):
+    def _NewtonRaphson(self, u_prev, Jac, Residual,
+                       tol = 1e-8, max_iter = 100,
+                       line_search = None, relaxation_parameter = 0,
+                       verbose = False, run_checks = False):
         """
         Newton solver for one implicit time-step.
         u_prev : vector at previous time step (size 2*N)
@@ -376,9 +374,24 @@ class CahnHilliardSolver():
         # start from previous solution as initial guess
         u = np.copy(u_prev)
         error = []
+        
+        if relaxation_parameter < 0 or relaxation_parameter >=1.0:
+            raise ValueError(f"'relaxation_parameter' must be on range (0, 1), currently equal to {relaxation_parameter}.")
+        
+        if isinstance(line_search, str):
+            match line_search.lower():
+                case 'armijo':
+                    update_rule = lambda u_prev, u, du, res_norm: self.apply_backtracking(u_prev, u, du, res_norm,Residual, relaxation_parameter=relaxation_parameter)[0]
+                case _: raise ValueError("'line_search' must be on eof {'armijo'}, currently {}".format(line_search))
+        elif line_search is None:
+            update_rule = lambda u_prev, u, du, res_norm: u + (1-relaxation_parameter)*du 
+        else:
+            raise ValueError("Unrecognized 'line_search' algorithim")
+        
+        
         for it in range(max_iter):
             # build residual at current iterate
-            res = self.Residual(u_prev, u)
+            res = Residual(u_prev, u)
             res_norm = np.linalg.norm(res)
             
             if verbose:
@@ -389,55 +402,40 @@ class CahnHilliardSolver():
             if res_norm < tol:
                 if verbose:
                     print()
-                if run_checks:
-                    fig, ax = plt.subplots()
-                    ax.semilogy(error)
-                    plt.show()
+                # if run_checks:
+                #     fig, ax = plt.subplots()
+                #     ax.semilogy(error)
+                #     plt.show()
                 return u
 
             # assemble Jacobian for current u
-            H = self.__assemble_H(u[:self.__N])                           # H depends on u
-
-            J = bmat([[(1.0 / self.__dt)*self.M,                            self.K],
-                      [- self.epsilon * self.K - (1.0 / self.epsilon) * H,  self.M]], format='csc')
+            J = Jac(u[:self.__N])
 
             if run_checks:
-                j_res= self.fd_jacobian_check(u_prev, u)
+                j_res= self.fd_jacobian_check(Residual, Jac, u_prev, u)
                 print(f"\t Jacobian relative error = {j_res:.4e}")
 
             # Solve linear system J * du = -res
             # factorize for speed/stability
-            
             lu = linalg.splu(J)
             du = lu.solve(-res)
-            # du,_ = linalg.gmres(J, -res)
-            # print(du)
 
             # update
-            u += du
+            u = update_rule(u_prev, u, du, res_norm)
             
-            # # damping / safety: if update is huge, optionally damp (not necessary for small dt)
-            # if np.linalg.norm(du) > 1e-1 * np.linalg.norm(u):
-            #     u -= 0.5*du   # example damping
-            
-            # # Armijo Backtracking
-            # u, _ = self.apply_backtracking(u_prev, u, du, res_norm)
-
         # if we exit loop not converged:
-        fig, ax = plt.subplots()
-        ax.semilogy(error)
-        plt.show()
-        raise RuntimeError("Newton-Raphson failed to converge after max_iter")
+        warnings.warn("Newton-Raphson failed to converge after max_iter")
+        return u
 
-    def apply_backtracking(self, u_prev, u, du, res_norm, max_iters=10, c=1e-4, rho=0.5):
+    def apply_backtracking(self, u_prev, u, du, res_norm, Residual, relaxation_parameter = 0.0, max_iters=10, c=1e-4, rho=0.5):
         """Backtracking Armijo line-search. Returns new u, alpha used."""
-        alpha = 1.0
-        Fu = lambda v: np.linalg.norm(self.Residual(u_prev, v))  # adjust if your Residual needs different args
+        alpha = 1.0 - relaxation_parameter
+        Fu = lambda v: np.linalg.norm(Residual(u_prev, v))  # adjust if your Residual needs different args
         f0 = res_norm
         for k in range(max_iters):
             u_trial = u + alpha * du
             f_trial = Fu(u_trial)
-            if f_trial <= f0 + c * alpha * (-np.dot(self.Residual(u_prev, u), du)):  # Armijo condition
+            if f_trial <= f0 + c * alpha * (-np.dot(Residual(u_prev, u), du)):  # Armijo condition
                 return u_trial, alpha
             alpha *= rho
         # if line search fails, return the damped update
@@ -462,7 +460,7 @@ class CahnHilliardSolver():
             J += self.element.compute_J_e(self.epsilon, he, u[i:i+self.element.n])
         return J
     
-    def plot_contour(self, levels = 100, cmap = 'hot'):
+    def plot_contour(self, levels = 100, cmap = 'jet'):
         fig, ax = plt.subplots()
         X, Y = np.meshgrid(self.x, self.t)
         C = ax.contourf(X, Y, self.sol_c, levels = levels, cmap = cmap)
