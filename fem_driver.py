@@ -13,31 +13,50 @@ if __name__ == '__main__':
 
     # Discretization
     L = 1
-    N = 10
+    N = 20
     N = 40
     N = 100
     # N = 200
     poly_degree = 1
+    h = L/N
+    print(h)
+    print(2*np.sqrt(2)/9 *np.arctanh(0.95)*epsilon)
     
+    
+    ############################################################
+    # TIME STEPPERS AND APPRORPIATE PARAMETERS
+
     # Explicit
     dt = 1e-8
+    time_integrator = 0
 
     # Implicit
     dt = 1e-6
+    time_integrator = 1
     
-    # Semi implicit
-    dt = 5e-6
-    # dt = 1e-4
+    # Semi implicit CASE B
+    dt = 1e-4
+    time_integrator = 2
 
+
+    # 1ST ORDER SI SCHEME
+    dt = 1e-7
+    time_integrator = '1si'
+
+    # # 1ST STABILIZED ORDER SI SCHEME
+    # dt = 1e-4
+    # time_integrator = '1ssi'
+
+    dt = 1e-5
+    
     tEnd = dt*1
-    # tEnd = dt*10
-    tEnd = 5e-3
+    tEnd = 1e-3
     # tEnd = 5e-3
-    time_integrator = 3
     
     
-    print("Implicit time step restrictions: {:.4e}".format(4*epsilon**3))
-    print("Time step used: {:.4e}".format(dt))
+    print("Implicit dt restrictions: {:.4e}".format(4*epsilon**3))
+    print("1st order semi-implicit scheme dt restrictions: {:.4e}".format(4*epsilon**4))
+    print("dt used: {:.4e}".format(dt))
     print(int(tEnd/dt))
 
     # Initial conditions
@@ -50,12 +69,15 @@ if __name__ == '__main__':
     sol = CahnHilliardSolver(epsilon, 
                              number_of_elements=N, L = L, 
                              polynomial_order=poly_degree)
+    
     nonlinear_solver_options = {'run_checks': False,
                         #  'line_search': 'armijo',
                         #  'relaxation_parameter': 0.8,
                          'verbose' : False,
                          }
+    
     sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
+    sol.save()
 
     ###############################################################
     #  PLOTTING
@@ -73,7 +95,6 @@ if __name__ == '__main__':
     fig1.tight_layout()
     [_.set_xlabel('x') for _ in ax1]
     [_.grid() for _ in ax1]
-
     
 
     fig2, ax2 = plt.subplots(1,2)

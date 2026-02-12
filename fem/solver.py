@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import warnings
+import h5py, json
+from datetime import datetime, timezone
+from pathlib import Path
 
 from tqdm import tqdm
 from scipy.sparse import csc_matrix, bmat
@@ -17,12 +20,21 @@ ELEMENT_MAP = {1: LinearLegendreElement(),
                2: QuadraticLegendreElement()}
 
 
-TIME_INTEGRATOR_STRING2INT_MAP = {'explicit': 0, 
+TIME_INTEGRATOR_STR2INT_MAP = {'explicit': 0, 
                                   'implicit': 1,
                                   'a': 2,
                                   'b': 3, 
-                                  'c': 4,}
+                                  '1si': 4,
+                                  '1si_stabilized': 5,
+                                  '1ssi' : 5,
+                                  }
 
+TIME_INTEGRATOR_INT2STR_MAP = {0: 'explicit', 
+                               1: 'implicit',
+                               2: 'a',
+                               3: 'b',
+                               4: '1s1',
+                               5: '1ss1'}
 
 
 class CahnHilliardSolver():
@@ -44,12 +56,14 @@ class CahnHilliardSolver():
         
     def solve(self, u0, T:float, dt:float, time_integrator:str|int = 'explicit', nonlinear_solver_options:dict = {}):
         
+        self.__T = T
         self.__dt = dt
         self.__t = np.arange(0, T+dt, dt)
         self.__nt = len(self.__t)
 
         if isinstance(time_integrator, str):
-            time_integrator = TIME_INTEGRATOR_STRING2INT_MAP[time_integrator.lower()]
+            time_integrator = TIME_INTEGRATOR_STR2INT_MAP[time_integrator.lower()]
+        self.__solver_name = TIME_INTEGRATOR_INT2STR_MAP[time_integrator]
         match time_integrator:
             case 0 :
                 _time_stepper = self._explicit
@@ -60,7 +74,9 @@ class CahnHilliardSolver():
             case 3:
                 _time_stepper = self._semi_implicit_B
             case 4:
-                _time_stepper = self._semi_implicit_C
+                _time_stepper = self._1SI_scheme
+            case 5:
+                _time_stepper = self._1SSI_scheme
             case _:
                 raise ValueError
             
@@ -105,19 +121,19 @@ class CahnHilliardSolver():
             print(f"\nERROR IN ITERATION: {it:4d}")
             print("MASS IS NOT BEING CONSERVED!!!!!!!!!!!!!!!!!!")
             print(self.__mass[0], self.__mass[it])
-            self.__t = self.__t[:it]
-            self.__mass = self.__mass[:it]
-            self.__J = self.__J[:it]
-            self.__u = self.__u[:it,:]
+            self.__t = self.__t[:it+1]
+            self.__mass = self.__mass[:it+1]
+            self.__J = self.__J[:it+1]
+            self.__u = self.__u[:it+1,:]
             return 1
         elif (self.__J[it]-self.__J[it-1])/self.__J[it-1] > 0.01:
             print(f"\nERROR IN ITERATION: {it:4d}")
             print("J INCREASING!!!!!!!!!!!!!!!!!!")
             print(self.__J[it-1], self.__J[it], )
-            self.__t = self.__t[:it]
-            self.__mass = self.__mass[:it]
-            self.__J = self.__J[:it]
-            self.__u = self.__u[:it,:]
+            self.__t = self.__t[:it+1]
+            self.__mass = self.__mass[:it+1]
+            self.__J = self.__J[:it+1]
+            self.__u = self.__u[:it+1,:]
             return 2
         else:
             return 0
@@ -224,10 +240,9 @@ class CahnHilliardSolver():
     
     
     ########################################################################
-    # SEMI-IMPLICIT B TIME STEPPING
+    # SEMI-IMPLICIT A TIME STEPPING
     def _semi_implicit_A(self):
-        """Implicit time stepping"""
-        
+        """EYRRE solver, case A"""
         
         def Residual(u_prev, u):
             res = np.zeros((self.__N*2,))
@@ -268,6 +283,9 @@ class CahnHilliardSolver():
             he = self.x[i+self.element.n-1] - self.x[i]
             self.element._c1(b[i:i+self.element.n], he, evaluation_C[i:i+self.element.n])    
         return b
+    
+    
+    
     ########################################################################
     # SEMI-IMPLICIT B TIME STEPPING
     def _semi_implicit_B(self):
@@ -304,49 +322,88 @@ class CahnHilliardSolver():
         b[self.__N:] *= 1/self.epsilon
 
     ########################################################################
-    # SEMI-IMPLICIT C TIME STEPPING
-    def _semi_implicit_C(self):
-        """Semi-Implicit methods Case B"""
+    # 1st-order Semi-Implicit Scheme (1SI)
 
-        A21 = np.zeros((self.__N, self.__N))
+    def _1SI_scheme(self):
+        """
+        1st-order Semi-Implicit Scheme (1SI)
+        
+        Ref: NUMERICAL APPROXIMATIONS OF ALLEN-CAHN AND CAHN-HILLIARD EQUATIONS - Jie Shen
+        """
+
+        # Compute LHS: This is done once for stencil B
+        A = bmat([[-self.epsilon*self.K, self.M],
+                  [self.M,               self.__dt*self.K]], format='csc')
         b = np.zeros((self.__N*2,))
+        
+        # Pre-compute LU factorisation
+        lu = linalg.splu(A)
         for it in tqdm(range(1,self.__nt)):
-        # for it in range(1,self.__nt):
             # Update RHS
-            self.__update_rhs_C(b, self.__u[it-1,:self.__N])
+            self.__update_rhs_1SI(b, self.__u[it-1,:self.__N])
             
-            # Update LHS
-            self.__update_lhs_C(A21, self.__u[it-1,:self.__N])
-            A = bmat([[self.M/self.__dt, self.K],
-                      [A21, self.M]], format='csc')
-    
             # SOLVE
-            self.__u[it] = linalg.spsolve(A, b)
-            
+            self.__u[it] = lu.solve(b)
+
             flag = self.__checks(it)
 
             if flag != 0:
                 return self.__u[:it-1,:]
-    
-    def __update_lhs_C(self, A, evaluation_C):
-        A[:] = 0
-        for e in range(self.__ne):
-            i = e*self.element.degree
-            he = self.x[i+self.element.n-1] - self.x[i]
-            self.element.Awc_c(A[i:i+self.element.n,i:i+self.element.n], he, evaluation_C[i:i+self.element.n])
-        A[:] *= -1/self.epsilon
-        A[:] += -self.epsilon*self.K + 1/self.epsilon*self.M
-
-    def __update_rhs_C(self, b, evaluation_C):
-        """Assemble non-linear vector for semi implicit B"""
-        b[:self.__N] = 1/self.__dt*(self.M@evaluation_C)
-        b[self.__N:] = 0
-        for e in range(self.__ne):
-            i = e*self.element.degree
-            he = self.x[i+self.element.n-1] - self.x[i]
-            self.element._c3(b[self.__N+i:self.__N+i+self.element.n], he, evaluation_C[i:i+self.element.n])    
-        b[self.__N:] *= -2/self.epsilon
         
+    def __update_rhs_1SI(self, b, evaluation_C):
+        """Assemble non-linear vector for semi implicit B"""
+        temp = (self.M@evaluation_C)
+        b[self.__N:] = temp
+        b[:self.__N] = -temp
+        for e in range(self.__ne):
+            i = e*self.element.degree
+            he = self.x[i+self.element.n-1] - self.x[i]
+            self.element._c3(b[i:i+self.element.n], he, evaluation_C[i:i+self.element.n])
+        b[:self.__N] *= 1/self.epsilon
+
+    
+    
+    ########################################################################
+    # 1st-order Stabilized Semi-Implicit Scheme (1SSI)
+
+    def _1SSI_scheme(self):
+        """
+        1st-order Stabilized Semi-Implicit Scheme (1SSI)
+        
+        Ref: NUMERICAL APPROXIMATIONS OF ALLEN-CAHN AND CAHN-HILLIARD EQUATIONS - Jie Shen
+        """
+        S = 2
+        # Compute LHS: This is done once for stencil B
+        A11 = -self.epsilon*self.K - S/self.epsilon*self.M
+        A = bmat([[A11 ,    self.M],
+                  [self.M,  self.__dt*self.K]], format='csc')
+        b = np.zeros((self.__N*2,))
+        
+        # Pre-compute LU factorisation
+        lu = linalg.splu(A)
+        for it in tqdm(range(1,self.__nt)):
+            # Update RHS
+            self.__update_rhs_1SSI(b, self.__u[it-1,:self.__N], S)
+            
+            # SOLVE
+            self.__u[it] = lu.solve(b)
+
+            flag = self.__checks(it)
+
+            if flag != 0:
+                return self.__u[:it-1,:]
+        
+    def __update_rhs_1SSI(self, b, evaluation_C, S):
+        """Assemble non-linear vector for 1st order stabilized semi-implicit scheme"""
+        temp = (self.M@evaluation_C)
+        b[self.__N:] = temp
+        b[:self.__N] = -temp - S*temp
+        for e in range(self.__ne):
+            i = e*self.element.degree
+            he = self.x[i+self.element.n-1] - self.x[i]
+            self.element._c3(b[i:i+self.element.n], he, evaluation_C[i:i+self.element.n])
+        b[:self.__N] *= 1/self.epsilon
+
 
     ########################################################################
     # NONLINEAR SOLVER
@@ -487,8 +544,57 @@ class CahnHilliardSolver():
             w_interp[j:j+nodes_per_elements] = np.dot(u[self.__N+i:self.__N+i+self.element.n], phi)
         return x_interp, c_interp, w_interp
 
+    def save(self, filename = None, directory = None, append_time = False):
+        if filename is None:
+            filename = f"Cahn_Hilliard_solution_{self.__solver_name}_CG{self.element.degree}_Ne{self.Ne}_T{self.__T:.1e}_dt{self.__dt:.1e}"
 
-    
+        if append_time:
+            filename += "_" + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
+
+        # Ensure extension
+        if not filename.endswith(".h5"):
+            filename += ".h5"
+        
+        # Determine directory
+        if directory is None:
+            directory = Path.cwd() / "solution"
+        else:
+            directory = Path(directory)
+
+        # Create directory if it does not exist
+        directory.mkdir(parents=True, exist_ok=True)
+        filepath = directory / filename
+
+        with h5py.File(filepath, "w") as f:
+            sol_grp = f.create_group("solution")
+            
+            # -----------------
+            # Save arrays
+            # -----------------
+            arr_grp = sol_grp.create_group("arrays")
+            for name, array in zip(['sol_c', 'sol_w', 't', 'x', 'mass', 'J'], [self.sol_c, self.sol_w, self.t, self.x, self.__mass, self.__J]):
+                arr_grp.create_dataset(
+                    name,
+                    data=array,
+                    compression="gzip",
+                    compression_opts=4,
+                    shuffle=True
+            )
+
+
+            # -----------------
+            # Save scalars
+            # -----------------
+            scal_grp = sol_grp.create_group("scalars")
+            for name, value in zip(['Ne', 'N', 'dt', 'T'], [self.__ne, self.__N, self.__dt, self.__T]):
+                scal_grp.create_dataset(name, data=value)
+
+            # -----------------
+            # Save metadata
+            # -----------------
+            sol_grp.attrs["saved_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
+        
+        print("Simulation successfully saved as : {}".format(filepath))
     ######################################################
     # PROPERTIES
 
