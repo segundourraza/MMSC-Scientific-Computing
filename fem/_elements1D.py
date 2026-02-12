@@ -110,6 +110,7 @@ class _LegendreElement(ABC):
             for i in range(self.n):
                 b[i] += ch3*phi[i]*(he/2)*wi
     
+    
     def Awc_c(self, H, he, Ce):
         for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_Ne)):
             phi = self.basis_functions(xi)

@@ -25,18 +25,21 @@ TIME_INTEGRATOR_STR2INT_MAP = {'explicit': 0,
                                   'a': 2,
                                   'b': 3, 
                                   '1si': 4,
-                                  '1si_stabilized': 5,
                                   '1ssi' : 5,
+                                  '2ssi' : 6,
                                   }
 
 TIME_INTEGRATOR_INT2STR_MAP = {0: 'explicit', 
                                1: 'implicit',
                                2: 'a',
                                3: 'b',
-                               4: '1s1',
-                               5: '1ss1'}
+                               4: '1si',
+                               5: '1ssi',
+                               6: '2ssi',
+                               }
 
-
+STABILIZATION_CONSTANT = 2.5
+        
 class CahnHilliardSolver():
 
     def __init__(self, epsilon:float, number_of_elements: int, L:float, polynomial_order:int = 1):
@@ -77,6 +80,8 @@ class CahnHilliardSolver():
                 _time_stepper = self._1SI_scheme
             case 5:
                 _time_stepper = self._1SSI_scheme
+            case 6: 
+                _time_stepper = self._2SSI_scheme
             case _:
                 raise ValueError
             
@@ -372,9 +377,8 @@ class CahnHilliardSolver():
         
         Ref: NUMERICAL APPROXIMATIONS OF ALLEN-CAHN AND CAHN-HILLIARD EQUATIONS - Jie Shen
         """
-        S = 2
         # Compute LHS: This is done once for stencil B
-        A11 = -self.epsilon*self.K - S/self.epsilon*self.M
+        A11 = -self.epsilon*self.K - STABILIZATION_CONSTANT/self.epsilon*self.M
         A = bmat([[A11 ,    self.M],
                   [self.M,  self.__dt*self.K]], format='csc')
         b = np.zeros((self.__N*2,))
@@ -383,7 +387,7 @@ class CahnHilliardSolver():
         lu = linalg.splu(A)
         for it in tqdm(range(1,self.__nt)):
             # Update RHS
-            self.__update_rhs_1SSI(b, self.__u[it-1,:self.__N], S)
+            self.__update_rhs_1SSI(b, self.__u[it-1,:self.__N], STABILIZATION_CONSTANT)
             
             # SOLVE
             self.__u[it] = lu.solve(b)
@@ -403,6 +407,76 @@ class CahnHilliardSolver():
             he = self.x[i+self.element.n-1] - self.x[i]
             self.element._c3(b[i:i+self.element.n], he, evaluation_C[i:i+self.element.n])
         b[:self.__N] *= 1/self.epsilon
+
+
+
+    
+    ########################################################################
+    # 2nd order Stabilized Semi-Implicit Scheme (2SSI)
+
+    def _2SSI_scheme(self):
+        """
+        2nd-order Stabilized Semi-Implicit Scheme (2SSI)
+        
+        Ref: NUMERICAL APPROXIMATIONS OF ALLEN-CAHN AND CAHN-HILLIARD EQUATIONS - Jie Shen
+        """
+    
+        # USE A TIME STEP OF 1SSI
+        # Since the scheme is second order, we require two previous computations to propagate solution
+        # Compute LHS: This is done once for stencil B
+        A11 = -self.epsilon*self.K - STABILIZATION_CONSTANT/self.epsilon*self.M
+        A = bmat([[A11 ,    self.M],
+                  [self.M,  self.__dt*self.K]], format='csc')
+        b = np.zeros((self.__N*2,))
+        
+        # Pre-compute LU factorisation
+        lu = linalg.splu(A)
+        # Update RHS
+        self.__update_rhs_1SSI(b, self.__u[0,:self.__N], STABILIZATION_CONSTANT)
+        # Solve
+        self.__u[1] = lu.solve(b)
+        # Run checks
+        flag = self.__checks(1)
+
+
+        # START USING 2SSI  
+        A11 = -self.epsilon*self.K - STABILIZATION_CONSTANT/self.epsilon*self.M
+        A = bmat([[A11 ,    self.M],
+                  [self.M,  2/3*self.__dt*self.K]], format='csc')
+        lu = linalg.splu(A)
+        
+        for it in tqdm(range(2,self.__nt)):
+            # Update RHS
+            self.__update_rhs_2SSI(b, self.__u[it-2,:self.__N], self.__u[it-1,:self.__N], STABILIZATION_CONSTANT)
+            
+            # SOLVE
+            self.__u[it] = lu.solve(b)
+
+            flag = self.__checks(it)
+
+            if flag != 0:
+                return self.__u[:it-1,:]
+        
+    def __update_rhs_2SSI(self, b, evaluation_C1, evaluation_C2, S):
+        """Assemble non-linear vector for 1st order stabilized semi-implicit scheme"""
+        Mc1 = (self.M@evaluation_C1)
+        Mc2 = (self.M@evaluation_C2)
+        
+        phi1 = np.zeros((self.__N,))
+        phi2 = np.zeros((self.__N,))
+        phi1[:] = -Mc1
+        phi2[:] = -Mc2
+        for e in range(self.__ne):
+            i = e*self.element.degree
+            he = self.x[i+self.element.n-1] - self.x[i]    
+            self.element._c3(phi1[i:i+self.element.n], he, evaluation_C1[i:i+self.element.n])
+            self.element._c3(phi2[i:i+self.element.n], he, evaluation_C2[i:i+self.element.n])
+        b[:self.__N] = -2*S*Mc2 + S*Mc1 + 2*(phi2) - phi1
+        b[:self.__N] *= 1/self.epsilon
+        b[self.__N:] = 4/3*Mc2 - 1/3*Mc1
+
+
+
 
 
     ########################################################################

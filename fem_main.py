@@ -8,6 +8,21 @@ np.set_printoptions(linewidth = 240)
 
 if __name__ == '__main__':
 
+    # Physics
+    epsilon = 0.01
+
+    # Discretization
+    L = 1
+    N = 20
+    N = 40
+    N = 100
+    # N = 200
+    poly_degree = 1
+    h = L/N
+    print(h)
+    print(2*np.sqrt(2)/9 *np.arctanh(0.95)*epsilon)
+    
+    
     ############################################################
     # TIME STEPPERS AND APPRORPIATE PARAMETERS
 
@@ -16,26 +31,27 @@ if __name__ == '__main__':
     time_integrator = 0
 
     # Implicit
+    dt = 5e-5
     dt = 1e-6
     time_integrator = 1
     
-    # Semi implicit CASE A
-    dt = 1e-4
-    time_integrator = 2
+    # # Semi implicit CASE A
+    # dt = 1e-4
+    # time_integrator = 2
 
 
-    # Semi implicit CASE B
-    dt = 1e-4
-    time_integrator = 3
+    # # Semi implicit CASE B
+    # dt = 1e-4
+    # time_integrator = 3
 
 
     # # 1ST ORDER SI SCHEME
     # dt = 1e-6
     # time_integrator = '1si'
 
-    # 1ST ORDER STABILIZED SI SCHEME
-    dt = 1e-5
-    time_integrator = '1ssi'
+    # # 1ST ORDER STABILIZED SI SCHEME
+    # dt = 1e-4
+    # time_integrator = '1ssi'
 
     
     # # 2ND ORDER STABILIZED SI SCHEME
@@ -43,35 +59,37 @@ if __name__ == '__main__':
     # time_integrator = '2ssi'
 
 
-    ###################################################
-    # General Parameters
-    epsilon = 0.01
-    L = 1
-    poly_degree = 1
     
-    # Initial conditions
-    def c0(x): return np.cos(np.pi/L*x)
+    # dt = 1e-5
     
-    # T
     tEnd = dt*1
     tEnd = 1e-3
     # tEnd = 5e-3
     
     
+    print("Implicit dt restrictions: {:.4e}".format(4*epsilon**3))
+    print("1st order semi-implicit scheme dt restrictions: {:.4e}".format(4*epsilon**4))
+    print("dt used: {:.4e}".format(dt))
+    print(int(tEnd/dt))
+
+    # Initial conditions
+    # def c0(x): return np.sin(np.pi/L*x)
+    def c0(x): return np.cos(np.pi/L*x)
+    # def c0(x): return np.ones_like(x)
+    # def c0(x): return np.sin(np.pi/(L)*x)
+
+    # Nonlinear solver
+    sol = CahnHilliardSolver(epsilon, 
+                             number_of_elements=N, L = L, 
+                             polynomial_order=poly_degree)
     
-    for N in [4, 10, 50, 100, 500, 1000, 5000]:
-        # Nonlinear solver
-        sol = CahnHilliardSolver(epsilon, 
-                                number_of_elements=N, L = L, 
-                                polynomial_order=poly_degree)
-        
-        nonlinear_solver_options = {'run_checks': False,
-                            #  'line_search': 'armijo',
-                            #  'relaxation_parameter': 0.8,
-                            'verbose' : False,
-                            }
-        sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
-        sol.save()
+    nonlinear_solver_options = {'run_checks': False,
+                        #  'line_search': 'armijo',
+                        #  'relaxation_parameter': 0.8,
+                         'verbose' : False,
+                         }
+    sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
+    # sol.save()
 
     # dts = [1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7]
     # for dt in dts:
