@@ -43,7 +43,7 @@ def analyzer_contours_with_dt(prefix, dts, levels = 100, cmap = 'jet', fp = Path
     fcontour_data = []
     Nes = [] 
     fig1, ax1 = plt.subplots(1,2)
-    for idx,name in enumerate(file_list):
+    for i,name in enumerate(file_list):
         arrays, scalars = load_solution_hdf5(fp / name)
 
         # EXTRACT DATA
@@ -57,8 +57,8 @@ def analyzer_contours_with_dt(prefix, dts, levels = 100, cmap = 'jet', fp = Path
         X, Y = np.meshgrid(x, t)
         fcontour_data.append([X, Y, sol_c, sol_w])
         
-        ax1[0].semilogy(t[1:], abs(mass[1:]- mass[0]), label = f"$N_e$ = {ne}")
-        ax1[1].plot(t, J, label = f"$N_e$ = {ne}")
+        ax1[0].semilogy(t[1:], abs(mass[1:]- mass[0]), label = f"$\\Delta$t = {dts[i]}")
+        ax1[1].plot(t, J, label =  f"$\\Delta$t = {dts[i]}")
 
         
     ax1[1].legend(fontsize = 12)
@@ -84,19 +84,18 @@ def analyzer_contours_with_dt(prefix, dts, levels = 100, cmap = 'jet', fp = Path
     fig2, ax2 = plt.subplots(1,len(Nes),sharey=True)
     fig2.subplots_adjust(wspace=0.05)
 
-    for i,idx in enumerate(np.argsort(Nes)):
+    for i,(ax, data) in enumerate(zip(ax2, fcontour_data)):
         ax = ax2[i]
-        title = f"$N_e$ = {Nes[idx]}"
-        X, Y, Z,_ = fcontour_data[idx]
-        im = ax.contourf(X, Y, Z, levels = levels, shading="auto", vmin=vmin, vmax=vmax, cmap=cmap)
-        ax.set_title(title)
+        X, Y, Z,_ = data
+        im = ax.contourf(X, Y, Z, levels = levels, vmin=vmin, vmax=vmax, cmap=cmap)
+        ax.set_title(f"$\\Delta$t = {dts[i]}", fontsize = 10)
         ax.set_xlabel("x")
         ax.set_xlim(right = 0.99)
     ax2[0].set_ylabel("t", rotation = 0, labelpad = 10)
     ax2[0].ticklabel_format(style='scientific', axis='y', scilimits=(0, 0))
 
     # Horizontal colorbar at bottom
-    cbar = fig1.colorbar(
+    cbar = fig2.colorbar(
         im,
         ax=ax2,
         orientation="horizontal",
@@ -115,19 +114,18 @@ def analyzer_contours_with_dt(prefix, dts, levels = 100, cmap = 'jet', fp = Path
     fig2, ax2 = plt.subplots(1,len(Nes),sharey=True)
     fig2.subplots_adjust(wspace=0.05)
 
-    for i,idx in enumerate(np.argsort(Nes)):
+    for i,i in enumerate(np.argsort(Nes)):
         ax = ax2[i]
-        title = f"$N_e$ = {Nes[idx]}"
-        X, Y, _, Z = fcontour_data[idx]
+        X, Y, _, Z = fcontour_data[i]
         im = ax.contourf(X, Y, Z, levels = levels, shading="auto", vmin=vmin, vmax=vmax, cmap=cmap)
-        ax.set_title(title)
+        ax.set_title(f"$\\Delta$t = {dts[i]}", fontsize = 10)
         ax.set_xlabel("x")
         ax.set_xlim(right = 0.99)
     ax2[0].set_ylabel("t", rotation = 0, labelpad = 10)
     ax2[0].ticklabel_format(style='scientific', axis='y', scilimits=(0, 0))
 
     # Horizontal colorbar at bottom
-    cbar = fig1.colorbar(
+    cbar = fig2.colorbar(
         im,
         ax=ax2,
         orientation="horizontal",
@@ -239,10 +237,9 @@ def analyzer_contours_with_Ne(prefix, dt, levels = 100, cmap = 'jet', fp = Path.
 
     for i,idx in enumerate(np.argsort(Nes)):
         ax = ax2[i]
-        title = f"$N_e$ = {Nes[idx]}"
         X, Y, Z,_ = fcontour_data[idx]
-        im = ax.contourf(X, Y, Z, levels = levels, shading="auto", vmin=vmin, vmax=vmax, cmap=cmap)
-        ax.set_title(title)
+        im = ax.contourf(X, Y, Z, levels = levels, vmin=vmin, vmax=vmax, cmap=cmap)
+        ax.set_title(f"$N_e$ = {Nes[idx]}", fontsize = 10)
         ax.set_xlabel("x")
         ax.set_xlim(right = 0.99)
     ax2[0].set_ylabel("t", rotation = 0, labelpad = 10)
@@ -262,17 +259,16 @@ def analyzer_contours_with_Ne(prefix, dt, levels = 100, cmap = 'jet', fp = Path.
     
     #####################################################
     # CONTOUR PLOT W
-    vmin2 = np.floor(min(np.nanmin(d[-1]) for d in fcontour_data))
-    vmax2 = np.ceil(max(np.nanmax(d[-1]) for d in fcontour_data))
+    vmin3 = np.floor(min(np.nanmin(d[-1]) for d in fcontour_data))
+    vmax3 = np.ceil(max(np.nanmax(d[-1]) for d in fcontour_data))
+    
     fig3, ax3 = plt.subplots(1,len(Nes),sharey=True)
     fig3.subplots_adjust(wspace=0.05)
-
     for i,idx in enumerate(np.argsort(Nes)):
         ax = ax3[i]
-        title = f"$N_e$ = {Nes[idx]}"
         X, Y, _, Z = fcontour_data[idx]
-        im2 = ax.contourf(X, Y, Z, levels = levels, vmin=vmin2, vmax=vmax2, cmap=cmap)
-        ax.set_title(title)
+        im2 = ax.contourf(X, Y, Z, levels = levels, vmin=vmin3, vmax=vmax3, cmap=cmap)
+        ax.set_title( f"$N_e$ = {Nes[idx]}", fontsize = 10)
         ax.set_xlabel("x")
         ax.set_xlim(right = 0.99)
                 
@@ -280,14 +276,14 @@ def analyzer_contours_with_Ne(prefix, dt, levels = 100, cmap = 'jet', fp = Path.
     ax3[0].ticklabel_format(style='scientific', axis='y', scilimits=(0, 0))
 
     # Horizontal colorbar at bottom
-    cbar2 = fig3.colorbar(
+    cbar3 = fig3.colorbar(
         im2,
         ax=ax3,
         orientation="horizontal",
         fraction=0.05,   # thickness of colorbar
         # pad=0.15         # distance from subplots
     )
-    cbar2.set_ticks(np.linspace(vmin2, vmax2, 5))  # fewer ticks → more spacing
+    cbar3.set_ticks(np.linspace(vmin3, vmax3, 5))  # fewer ticks → more spacing
 
 
 
@@ -318,14 +314,17 @@ def analyzer_space_complexity(prefix, dt,fp = Path.cwd() / "solution"):
 
     ne = np.array([_[0] for _ in complexity_data[:-1]])
     id = np.argsort(ne)
+    ne_crit = 1/(2*np.sqrt(2)/9 *np.arctanh(0.95)*0.01)
+    id2 = sorted([i for i, v in enumerate(ne) if v < ne_crit], key=lambda i: ne[i])
+    
     error = np.array([abs(_[1] - complexity_data[-1][1]) for _ in complexity_data[:-1]])
     fig3, ax3 = plt.subplots()
     ax3.loglog(ne[id], error[id], '-s')
-    m,c = np.polyfit(np.log(ne[id]), np.log(error[id]), 1)
+    m,c = np.polyfit(np.log(ne[id2]), np.log(error[id2]), 1)
     def f(x): return x**(m)*np.exp(c)
-    ax3.plot(ne[id], f(ne[id]), '--r', label = r"$\log(e) = {:.2f}\log(nt) + {:.2f}$".format(m,c))
+    ax3.plot(ne[id2], f(ne[id2]), '--r', label = r"$\log(e) = {:.2f}\log(nt) + {:.2f}$".format(m,c))
     
-    ax3.axvline(1/(2*np.sqrt(2)/9 *np.arctanh(0.95)*0.01), color = 'k', label = r"$N_{e,crit} = \frac{9}{2\sqrt{2}\tanh^{-1}(0.95)}$")
+    ax3.axvline(ne_crit, color = 'k', label = r"$N_{e,crit} = \frac{9}{2\sqrt{2}\tanh^{-1}(0.95)}$")
         
     ax3.grid(which='major', linestyle='-', linewidth=0.8)
     ax3.grid(which='minor', linestyle='-', linewidth=0.25)
@@ -355,7 +354,6 @@ if __name__ == '__main__':
     # # 1SSI
     # prefix = "Cahn_Hilliard_solution_1ssi_CG1_Ne100_T1.0e-03"
     # dts = [1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7]
-
     # analyzer_contours_with_dt(prefix, dts)
     # analyzer_time_complexity(prefix, dts)
     
@@ -363,7 +361,13 @@ if __name__ == '__main__':
     prefix = "Cahn_Hilliard_solution_1ssi_CG1"
     dt = 1e-5
     analyzer_contours_with_Ne(prefix, dt)
-    analyzer_space_complexity(prefix, dt)
+    # analyzer_space_complexity(prefix, dt)
+    
+    
+    # prefix = "Cahn_Hilliard_solution_1ssi_CG2"
+    # dt = 1e-5
+    # analyzer_contours_with_Ne(prefix, dt)
+    # analyzer_space_complexity(prefix, dt)
     
 
     plt.show()

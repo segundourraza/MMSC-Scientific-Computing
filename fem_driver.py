@@ -47,7 +47,7 @@ if __name__ == '__main__':
     # General Parameters
     epsilon = 0.01
     L = 1
-    poly_degree = 1
+    poly_degree = 2
     
     # Initial conditions
     def c0(x): return np.cos(np.pi/L*x)

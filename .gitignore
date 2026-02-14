@@ -3,4 +3,8 @@
 *.pyc
 *.pyo
 
+# ignore solution files
 **/*solution/
+
+# ignore vtk files
+*.vtk
