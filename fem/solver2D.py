@@ -9,7 +9,7 @@ import scipy.sparse.linalg as linalg
 from matplotlib.animation import FuncAnimation, PillowWriter
 
 from ._elements import LinearTriangularElement
-
+from ._config import _progress_range, LEAVE_TQDM_BAR
 
 TIME_INTEGRATOR_STR2INT_MAP = {
                                 'implicit': 1,
@@ -126,7 +126,7 @@ class CahnHilliardSolver2D:
         # TIME STEPPING
         # return
         _time_stepper()
-        tqdm.write("Simulation ended.")
+        tqdm.write("Simulation ended.\n")
         
     
     
@@ -136,13 +136,13 @@ class CahnHilliardSolver2D:
         """Semi-Implicit methods Case B"""
 
         # Used for Semi-Implicit methods B
-        ck = -self.epsilon*self.K - 2/self.epsilon*self.M
+        ck = -self.epsilon*self.K - (2/self.epsilon)*self.M
         # Compute LHS: This is done once for stencil B
         A = bmat([[ck, self.M],
                   [self.M, self.__dt*self.K]], format= 'csc')
         b = np.zeros((self.__N*2,))
         lu = linalg.splu(A)
-        for it in tqdm(range(1,self.__nt), leave=False, desc="Simulation running"):
+        for it in _progress_range(range(1, self.__nt), desc = "Simulation running"):
             # Update RHS
             self.__update_rhs_B(b, self.__u[it-1,:self.__N])
             
@@ -159,7 +159,7 @@ class CahnHilliardSolver2D:
         b[self.__N:] = (self.M@evaluation_C)
         b[:self.__N] = 0
         for e,con in enumerate(self.__connectivity):
-            self.element.b2_b(b[con],self.__detJ[e], evaluation_C[con])
+            self.element.b2_b(b[self.__N + con],self.__detJ[e], evaluation_C[con])
         b[:self.__N] *= 1/self.epsilon
 
     
@@ -229,11 +229,15 @@ class CahnHilliardSolver2D:
     def plot_solution(self, z, ax = None, cmap = 'jet', levels = 100, plot_mesh = False, **kwargs):
         if ax is None:
             ax = plt.gca()  
-        levels = np.linspace(-1, 1, levels)
+            
+        vmin = np.floor(np.nanmin(z))
+        vmax = np.ceil(np.nanmax(z))
+        
+        levels = np.linspace(vmin, vmax, levels)
         tcf = ax.tricontourf(self.__tri, z, levels, cmap = cmap)
         if plot_mesh:
             self.plot_mesh(ax=ax, **kwargs)
-        return tcf
+        return tcf, levels
 
     def animate_solution(self, cmap = 'jet', levels = 100,  out_path="gifs/tricontourf_animation.gif"):
         
@@ -249,9 +253,6 @@ class CahnHilliardSolver2D:
         
         def update(i):
             ax.clear()
-            # for coll in list(ax.collections):
-            #     coll.remove()
-
             tcf = ax.tricontourf(self.__tri, self.sol_c[i], levels=levels, cmap = cmap)
             ax.set_title(f"Tme step: {i}")
             return tcf
@@ -263,18 +264,15 @@ class CahnHilliardSolver2D:
 
         # Save as GIF
         writer = PillowWriter(fps=10)   # frames per second
+        pbar = tqdm(total= self.__nt, leave= LEAVE_TQDM_BAR, desc= "Animating solution...")
         
-        with tqdm(total=self.__nt-1,leave=False,desc = "Animating solution...") as pbar:
-            def progress(i, n):
-                pbar.update(1)
-
-            anim.save(
-                out_path,
-                writer=writer,
-                dpi=150,
-                progress_callback=progress
-            )
-        print(f"File saved successfully: {out_path}")
+        def progress(i, n):
+            pbar.update(1)
+        try:
+            anim.save(out_path,writer=writer,dpi=150,progress_callback=progress)
+        finally:
+            pbar.close()
+        tqdm.write(f"File saved successfully: {out_path}\n")
         plt.close(fig)
         
     #####################################################################

@@ -34,14 +34,15 @@ if __name__ == '__main__':
     # General Parameters
     epsilon = 0.01
     
-    tEnd = dt*2
+    tEnd = dt*10
     # tEnd = 1e-3
     # tEnd = 5e-3
     a = b = 1
 
-
-    def c0(x,y): return np.cos(np.pi/a*x)*np.sin(np.pi/b*y)
-    def c0(x,y): return np.random.random((len(x),))*2 - 1.0
+    n = 4
+    def c0(x,y): return np.cos(np.pi/a*x)*np.sin(np.pi/(b*n)*y)
+    def c0(x,y): return np.cos(2*np.pi/(a)*n*x)*np.sin(2*np.pi/(b)*n*y)
+    # def c0(x,y): return np.random.random((len(x),))*2 - 1.0
 
     # Nonlinear solver
     sol = CahnHilliardSolver2D.rectangular_domain(epsilon, a, b, mesh_size=0.02)
@@ -55,20 +56,37 @@ if __name__ == '__main__':
     # PLOTTING
 
     fig, ax = plt.subplots(1,2, constrained_layout = True)
-    tcf1 = sol.plot_solution(sol.sol_c[0],  ax= ax[0])
-    tcf2 = sol.plot_solution(sol.sol_c[-1], ax= ax[1])
+    tcf1, _ = sol.plot_solution(sol.sol_c[0],  ax= ax[0])
+    tcf2, _ = sol.plot_solution(sol.sol_c[-1], ax= ax[1])
 
-    cbar3 = fig.colorbar(
+    cbar = fig.colorbar(
         tcf2,
         ax=ax,
         orientation="horizontal",
         fraction=0.05,   # thickness of colorbar
         # pad=0.15         # distance from subplots
     )
-    cbar3.set_ticks(np.linspace(-1,1, 5))  # fewer ticks → more spacing
+    cbar.set_ticks(np.linspace(-1,1, 5))  # fewer ticks → more spacing
     
-    # [_.set_aspect(1) for _ in ax]
-    # fig.tight_layout()
+    
+    fig, ax = plt.subplots(1,2, constrained_layout = True)
+    tcf1, levels1 = sol.plot_solution(sol.sol_w[0],  ax= ax[0])
+    tcf2, levels2 = sol.plot_solution(sol.sol_w[-1], ax= ax[1])
+
+    cbar = fig.colorbar(
+        tcf2,
+        ax=ax,
+        orientation="horizontal",
+        fraction=0.05,   # thickness of colorbar
+        # pad=0.15         # distance from subplots
+    )
+    cbar.set_ticks(np.linspace(levels2[0],levels2[-1], 5))  # fewer ticks → more spacing
+    
+
+
+
+
+
 
     fig2, ax2 = plt.subplots(1,2)
     ax2[0].plot(sol.t, abs(sol.mass - sol.mass[0]))

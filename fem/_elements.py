@@ -264,6 +264,9 @@ class LinearTriangularElement():
             for i in range(self.n):
                 b2[i] += (ch3 - 3*ch)*phi[i]*(detJ)*wi
 
+
+
+
     @staticmethod
     def basis_functions(xi, eta):
         return [1 - xi - eta, xi, eta]
