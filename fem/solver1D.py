@@ -10,7 +10,7 @@ from scipy.sparse import csc_matrix, bmat
 import scipy.sparse.linalg as linalg
 
 
-from ._elements1D import _LegendreElement, LinearLegendreElement, QuadraticLegendreElement
+from ._elements import _LegendreElement, LinearLegendreElement, QuadraticLegendreElement
 
 
 
@@ -40,7 +40,7 @@ TIME_INTEGRATOR_INT2STR_MAP = {0: 'explicit',
 
 STABILIZATION_CONSTANT = 2.5
         
-class CahnHilliardSolver():
+class CahnHilliardSolver1D():
 
     def __init__(self, epsilon:float, number_of_elements: int, L:float, polynomial_order:int = 1):
         

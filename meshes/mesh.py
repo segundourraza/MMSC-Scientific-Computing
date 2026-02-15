@@ -18,6 +18,7 @@ poly_pts = [
     [0.0, 1.0, 0.0],
 ]
 
+
 with pygmsh.geo.Geometry() as geom:
     # create polygon; mesh_size is characteristic element size
     poly = geom.add_polygon(poly_pts, mesh_size=0.08)
@@ -41,9 +42,10 @@ triang = tri.Triangulation(points[:, 0],
                            tri_cells)
 
 plt.figure()
+plt.plot(points[:,0], points[:,1], '.k', ms = 6)
 plt.triplot(triang, linewidth=0.6)
 plt.gca().set_aspect("equal")
 plt.title("FEM Mesh")
 plt.show()
 
-meshio.write("meshes/polygon_mesh.vtk", mesh)
+# meshio.write("meshes/polygon_mesh.vtk", mesh)

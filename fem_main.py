@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from fem.solver import CahnHilliardSolver
+from fem.solver1D import CahnHilliardSolver1D
 # np.set_printoptions(suppress=True)
 # np.set_printoptions(precision=4,suppress=True)
 np.set_printoptions(linewidth = 240)
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     # def c0(x): return np.sin(np.pi/(L)*x)
 
     # Nonlinear solver
-    sol = CahnHilliardSolver(epsilon, 
+    sol = CahnHilliardSolver1D(epsilon, 
                              number_of_elements=N, L = L, 
                              polynomial_order=poly_degree)
     

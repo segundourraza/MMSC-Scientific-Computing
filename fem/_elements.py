@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from ._quadrature import triangle_quadrature
 import numpy as np
 
 ############################################################################
@@ -9,9 +10,6 @@ linear_basis_functions = [lambda xi: 0.5*(1-xi),
 linear_grad_basis_functions = [lambda xi: -0.5,
                                lambda xi: 0.5]
 
-
-
-
 quad_basis_function = [lambda x: -0.5*x*(1-x), 
                        lambda x: 1 - x*x, 
                        lambda x: 0.5*x*(1+x)]
@@ -19,6 +17,8 @@ quad_basis_function = [lambda x: -0.5*x*(1-x),
 quad_grad_basis_function = [lambda x: -0.5*(1-2*x), 
                             lambda x: -2*x, 
                             lambda x: 0.5*(1+2*x)]
+
+
 
 class _LegendreElement(ABC):
 
@@ -139,9 +139,6 @@ class _LegendreElement(ABC):
             M += wi*(he/2)*ch
         return M
     
-
-
-
 class LinearLegendreElement(_LegendreElement):
 
     degree: int = 1
@@ -174,8 +171,6 @@ class LinearLegendreElement(_LegendreElement):
     # AUXILIARY
     def compute_mass_e(self, he, Ce):
         return he/2*(Ce[0] + Ce[1])
-    
-
 
 class QuadraticLegendreElement(_LegendreElement):
 
@@ -208,4 +203,71 @@ class QuadraticLegendreElement(_LegendreElement):
         K[:] += 1/(3*he)*np.array([[7,  -8,  1],
                                    [-8, 16, -8],
                                    [1,  -8,  7]], dtype = float)
+
+
+class LinearTriangularElement():
+
+
+    n = 3 # Number of nodes in element
+
+    # Quadrature points
+    r_Ne:int = 3
+    r_J: int = 3
+
     
+
+    #############################################
+    # BASIC ELEMENT MATRICES
+    __A = 0.5*np.array([[1, -1, 0],
+                        [-1, 1, 0],
+                        [0, 0, 0]], dtype=float)
+    
+    __BpC = 0.5*np.array([[2, -1, -1],
+                          [-1, 0, 1],
+                          [-1, 1, 0]], dtype=float)
+    
+    __D = 0.5*np.array([[1, 0, -1],
+                        [0, 0, 0],
+                        [-1, 0, 1]], dtype=float)
+    
+    __M = (1/24)*np.array([[2, 1, 1],
+                           [1, 2, 1],
+                           [1, 1, 2]], dtype=float)
+    
+    def Me(self, M_global, con, detJ):
+        M_global[np.ix_(con,con)] += detJ*self.__M
+    
+    def Ke(self, K_global, con,detJ, invJ):
+        Se = invJ[0,0]**2*self.__A +invJ[0,0]*invJ[0,1]*self.__BpC + invJ[0,1]**2*self.__D
+        Sn = invJ[1,0]**2*self.__A +invJ[1,0]*invJ[1,1]*self.__BpC + invJ[1,1]**2*self.__D
+        K_global[np.ix_(con,con)] += detJ*(Se + Sn)
+
+    def Ne(self, N, detJ, Ce):
+        for (xi,eta), wi in zip(*triangle_quadrature(self.r_Ne)):
+            phi = self.basis_functions(xi,eta)
+            ch = np.dot(Ce, phi)
+            ch3 = (ch)**3
+            for i in range(self.n):
+                N[i] += (ch3 - ch)*phi[i]*detJ*wi
+    
+    
+    
+    ################################################################
+    # TIME STEPPING SPECIFIC MATRICES
+
+        
+    def b2_b(self, b2, detJ, Ce):
+        for (xi, eta), wi in zip(*triangle_quadrature(self.r_Ne)):
+            phi = self.basis_functions(xi, eta)
+            ch = np.dot(Ce, phi)
+            ch3 = (ch)**3
+            for i in range(self.n):
+                b2[i] += (ch3 - 3*ch)*phi[i]*(detJ)*wi
+
+    @staticmethod
+    def basis_functions(xi, eta):
+        return [1 - xi - eta, xi, eta]
+    
+    @staticmethod
+    def compute_mass_e(area, Ce):
+        return area*np.sum(Ce)/3
