@@ -126,7 +126,8 @@ class CahnHilliardSolver2D:
         # TIME STEPPING
         # return
         _time_stepper()
-
+        tqdm.write("Simulation ended.")
+        
     
     
     ########################################################################
@@ -141,7 +142,7 @@ class CahnHilliardSolver2D:
                   [self.M, self.__dt*self.K]], format= 'csc')
         b = np.zeros((self.__N*2,))
         lu = linalg.splu(A)
-        for it in tqdm(range(1,self.__nt)):
+        for it in tqdm(range(1,self.__nt), leave=False, desc="Simulation running"):
             # Update RHS
             self.__update_rhs_B(b, self.__u[it-1,:self.__N])
             
@@ -236,7 +237,6 @@ class CahnHilliardSolver2D:
 
     def animate_solution(self, cmap = 'jet', levels = 100,  out_path="gifs/tricontourf_animation.gif"):
         
-        print("\nAnimating solution...")
         levels = np.linspace(-1, 1, levels)
 
         # figure
@@ -264,19 +264,18 @@ class CahnHilliardSolver2D:
         # Save as GIF
         writer = PillowWriter(fps=10)   # frames per second
         
-        pbar = tqdm(total=self.__nt)
+        with tqdm(total=self.__nt-1,leave=False,desc = "Animating solution...") as pbar:
+            def progress(i, n):
+                pbar.update(1)
 
-        def progress(i, n):
-            pbar.update(1)
-
-        anim.save(
-            out_path,
-            writer=writer,
-            dpi=150,
-            progress_callback=progress
-        )
+            anim.save(
+                out_path,
+                writer=writer,
+                dpi=150,
+                progress_callback=progress
+            )
+        print(f"File saved successfully: {out_path}")
         plt.close(fig)
-        print("\nSaved tricontourf_animation.gif")
         
     #####################################################################
     # HELPER FUNCTIONS
@@ -288,7 +287,7 @@ class CahnHilliardSolver2D:
         return M
     
     def __compute_J(self, u):
-        return 0
+        return 1
     
     
     def __checks(self, it):

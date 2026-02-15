@@ -34,7 +34,7 @@ if __name__ == '__main__':
     # General Parameters
     epsilon = 0.01
     
-    tEnd = dt*100
+    tEnd = dt*2
     # tEnd = 1e-3
     # tEnd = 5e-3
     a = b = 1
