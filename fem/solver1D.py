@@ -9,7 +9,7 @@ from tqdm import tqdm
 from scipy.sparse import csc_matrix, bmat
 import scipy.sparse.linalg as linalg
 
-
+from ._config import STABILIZATION_CONSTANT
 from ._elements import _LegendreElement, LinearLegendreElement, QuadraticLegendreElement
 
 
@@ -38,7 +38,6 @@ TIME_INTEGRATOR_INT2STR_MAP = {0: 'explicit',
                                6: '2ssi',
                                }
 
-STABILIZATION_CONSTANT = 2.5
         
 class CahnHilliardSolver1D():
 

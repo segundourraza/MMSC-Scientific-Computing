@@ -5,11 +5,10 @@ import matplotlib.pyplot as plt
 from matplotlib.tri import Triangulation
 from scipy.sparse import csc_matrix, bmat
 import scipy.sparse.linalg as linalg
-
 from matplotlib.animation import FuncAnimation, PillowWriter
 
 from ._elements import LinearTriangularElement
-from ._config import _progress_range, LEAVE_TQDM_BAR
+from ._config import _progress_range, LEAVE_TQDM_BAR, STABILIZATION_CONSTANT
 
 TIME_INTEGRATOR_STR2INT_MAP = {
                                 'implicit': 1,
@@ -53,7 +52,7 @@ class CahnHilliardSolver2D:
     def __preprocessing(self,):
 
         # Compute Jacobian
-        self.__energy = [0]*self.__Ne
+        self.__J = [0]*self.__Ne
         self.__A = np.empty((self.__Ne,))
         self.__detJ = np.empty((self.__Ne,))
         self.__InvJ = [0]*self.__Ne
@@ -66,14 +65,12 @@ class CahnHilliardSolver2D:
             dy21 = y2 - y1
             dy31 = y3 - y1
 
-            J = np.column_stack((self.__nodes[con[2],:2] - self.__nodes[con[0],:2], self.__nodes[con[1],:2] - self.__nodes[con[0],:2]))   # 2x2
-            self.__A[e] = 0.5 * abs(np.linalg.det(J))
-            self.__energy[e] = np.array([[dx21, dx31],
-                             [dy21, dy31]])
-            
-            self.__detJ[e] = dy31*dx21 - dx31*dy21
+            self.__J[e] = np.array([[dx21, dx31],
+                                    [dy21, dy31]])  # Jacobian            
+            self.__detJ[e] = dy31*dx21 - dx31*dy21  # Det of jacobian
+            self.__A[e] = 0.5 * self.__detJ[e]      # Area of cell
             self.__InvJ[e] = (1/self.__detJ[e])*np.array([[dy31, -dx31],
-                                                          [-dy21, dx21]])
+                                                          [-dy21, dx21]]) # Inverse of jacobian
             
 
         # Evaluate 'Mass' and 'Stiffness' matrix. These DO NOT change with time or value of C
@@ -94,6 +91,8 @@ class CahnHilliardSolver2D:
         match time_integrator:
             case 3:
                 _time_stepper = self._semi_implicit_B
+            case 5:
+                _time_stepper = self._1SSI_scheme
             case _:
                 raise ValueError
             
@@ -119,7 +118,7 @@ class CahnHilliardSolver2D:
         self.__mass = np.empty((self.__nt,), dtype=float)
         self.__energy = np.empty((self.__nt,), dtype=float)
         self.__mass[0] = self.__compute_mass(self.__u[0])
-        self.__energy[0] = self.__compute_J(self.__u[0])
+        self.__energy[0] = self.__compute_energy(self.__u[0])
 
         
         ################################################
@@ -135,17 +134,23 @@ class CahnHilliardSolver2D:
     def _semi_implicit_B(self):
         """Semi-Implicit methods Case B"""
 
+        b = np.zeros((self.__N*2,))
+
         # Used for Semi-Implicit methods B
         ck = -self.epsilon*self.K - (2/self.epsilon)*self.M
         # Compute LHS: This is done once for stencil B
-        A = bmat([[ck, self.M],
-                  [self.M, self.__dt*self.K]], format= 'csc')
-        b = np.zeros((self.__N*2,))
+        A = bmat([[ck,     self.M],
+                  [self.M, self.__dt*self.K]], 
+                  format= 'csc')
+        # A = bmat([[self.M/self.__dt, self.K],
+        #           [ck,               self.M]], 
+        #           format='csc')
+        
         lu = linalg.splu(A)
         for it in _progress_range(range(1, self.__nt), desc = "Simulation running"):
             # Update RHS
             self.__update_rhs_B(b, self.__u[it-1,:self.__N])
-            
+
             # SOLVE
             self.__u[it] = lu.solve(b)
 
@@ -159,12 +164,49 @@ class CahnHilliardSolver2D:
         b[self.__N:] = (self.M@evaluation_C)
         b[:self.__N] = 0
         for e,con in enumerate(self.__connectivity):
-            self.element.b2_b(b[self.__N + con],self.__detJ[e], evaluation_C[con])
+            self.element.b2_b(b, con ,self.__detJ[e], evaluation_C[con])
         b[:self.__N] *= 1/self.epsilon
 
     
-    
-    
+    ########################################################################
+    # 1st-order Stabilized Semi-Implicit Scheme (1SSI)
+
+    def _1SSI_scheme(self):
+        """
+        1st-order Stabilized Semi-Implicit Scheme (1SSI)
+        
+        Ref: NUMERICAL APPROXIMATIONS OF ALLEN-CAHN AND CAHN-HILLIARD EQUATIONS - Jie Shen
+        """
+        # Compute LHS: This is done once for stencil B
+        A11 = -self.epsilon*self.K - STABILIZATION_CONSTANT/self.epsilon*self.M
+        A = bmat([[A11 ,    self.M],
+                  [self.M,  self.__dt*self.K]], format='csc')
+        b = np.zeros((self.__N*2,))
+        
+        # Pre-compute LU factorisation
+        lu = linalg.splu(A)
+        for it in _progress_range(range(1,self.__nt),desc = "Simulation running"):
+            # Update RHS
+            self.__update_rhs_1SSI(b, self.__u[it-1,:self.__N], STABILIZATION_CONSTANT)
+            
+            # SOLVE
+            self.__u[it] = lu.solve(b)
+
+            flag = self.__checks(it)
+
+            if flag != 0:
+                return self.__u[:it-1,:]
+        
+    def __update_rhs_1SSI(self, b, evaluation_C, S):
+        """Assemble non-linear vector for 1st order stabilized semi-implicit scheme"""
+        temp = (self.M@evaluation_C)
+        b[self.__N:] = temp
+        b[:self.__N] = -temp - S*temp
+        for e,con in enumerate(self.__connectivity):
+            self.element._c3(b, con, self.__detJ[e], evaluation_C[con])
+        b[:self.__N] *= 1/self.epsilon
+
+
     ####################################################################
     # ASSEMBLE GLOBAL LINEAR SYSTEMS
     def __assemble_M(self)->csc_matrix:
@@ -230,8 +272,8 @@ class CahnHilliardSolver2D:
         if ax is None:
             ax = plt.gca()  
             
-        vmin = np.floor(np.nanmin(z))
-        vmax = np.ceil(np.nanmax(z))
+        vmin = kwargs.get('vmin', np.floor(np.nanmin(z)))
+        vmax = kwargs.get('vmax', np.ceil(np.nanmax(z)))
         
         levels = np.linspace(vmin, vmax, levels)
         tcf = ax.tricontourf(self.__tri, z, levels, cmap = cmap)
@@ -239,7 +281,7 @@ class CahnHilliardSolver2D:
             self.plot_mesh(ax=ax, **kwargs)
         return tcf, levels
 
-    def animate_solution(self, cmap = 'jet', levels = 100,  out_path="gifs/tricontourf_animation.gif"):
+    def animate_solution(self, fps = 10, cmap = 'jet', levels = 100,  out_path="gifs/tricontourf_animation.gif"):
         
         levels = np.linspace(-1, 1, levels)
 
@@ -263,8 +305,9 @@ class CahnHilliardSolver2D:
             anim = FuncAnimation(fig, update, frames=self.__nt, interval=100, blit=False)
 
         # Save as GIF
-        writer = PillowWriter(fps=10)   # frames per second
-        pbar = tqdm(total= self.__nt, leave= LEAVE_TQDM_BAR, desc= "Animating solution...")
+        writer = PillowWriter(fps=fps)   # frames per second
+        # pbar = tqdm(total= self.__nt, leave= LEAVE_TQDM_BAR, desc= "Animating solution:")
+        pbar = _progress_range(range(self.__nt), "Animating solution")
         
         def progress(i, n):
             pbar.update(1)
@@ -284,14 +327,13 @@ class CahnHilliardSolver2D:
             M += self.element.compute_mass_e(self.__A[e], u[con])
         return M
     
-    def __compute_J(self, u):
+    def __compute_energy(self, u):
         return 1
-    
     
     def __checks(self, it):
         # Compute Conserved quantities
         self.__mass[it] = self.__compute_mass(self.__u[it])
-        self.__energy[it] = self.__compute_J(self.__u[it])
+        self.__energy[it] = self.__compute_energy(self.__u[it])
 
         if not np.isclose(self.__mass[it], self.__mass[0]):
             print(f"\nERROR IN ITERATION: {it:4d}")

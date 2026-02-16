@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       154,          7]
-NotebookDataLength[     17339,        523]
-NotebookOptionsPosition[     16626,        502]
-NotebookOutlinePosition[     17027,        518]
-CellTagsIndexPosition[     16984,        515]
+NotebookDataLength[     28759,        847]
+NotebookOptionsPosition[     27757,        823]
+NotebookOutlinePosition[     28158,        839]
+CellTagsIndexPosition[     28115,        836]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -188,9 +188,9 @@ Cell[CellGroupData[{
 Cell[BoxData[
  RowBox[{
   RowBox[{"(*", " ", 
-   RowBox[{
-   "COMPUTING", " ", "dx", " ", "MATRIX", " ", "IN", " ", "STIFFNESS", " ", 
-    "MATRIX"}], "*)"}], "\[IndentingNewLine]", 
+   RowBox[{"COMPUTING", " ", "STIFFNESS", " ", "MATRIX", " ", "SUBMATRICES"}],
+    "*)"}], "\[IndentingNewLine]", 
+  RowBox[{"(*", " ", "A", " ", "*)"}], "\[IndentingNewLine]", 
   RowBox[{
    RowBox[{"{", 
     RowBox[{
@@ -333,11 +333,295 @@ Cell[BoxData[
             RowBox[{"0", ",", "1"}], "}"}], ",", 
            RowBox[{"{", 
             RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}]}], 
-    "}"}], "\[IndentingNewLine]", 
-   RowBox[{"(*", " ", 
+    "}"}], "\[IndentingNewLine]", "\[IndentingNewLine]", 
+   RowBox[{"(*", " ", "B", " ", "*)"}], "\[IndentingNewLine]", 
+   RowBox[{"{", 
     RowBox[{
-    "COMPUTING", " ", "dy", " ", "MATRIX", " ", "IN", " ", "STIFFNESS", " ", 
-     "MATRIX"}], "*)"}], "\[IndentingNewLine]", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi1", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi1", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}], ",", 
+     "\[IndentingNewLine]", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi1", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi2", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}], ",", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi1", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi3", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}], ",", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi2", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi2", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}], ",", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi2", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi3", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}], ",", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi3", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi3", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}]}], 
+    "}"}], "\[IndentingNewLine]", "\[IndentingNewLine]", 
+   RowBox[{"(*", " ", "C", " ", "*)"}], "\[IndentingNewLine]", 
+   RowBox[{"{", 
+    RowBox[{
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi1", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi1", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}], ",", 
+     "\[IndentingNewLine]", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi1", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi2", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}], ",", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi1", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi3", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}], ",", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi2", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi2", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}], ",", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi2", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi3", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}], ",", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi3", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "y"}], "]"}], "*", 
+        RowBox[{"D", "[", 
+         RowBox[{
+          RowBox[{"phi3", "[", 
+           RowBox[{"x", ",", "y"}], "]"}], ",", "x"}], "]"}]}], ",", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"x", ",", "y"}], "}"}], "\[Element]", 
+        RowBox[{"Polygon", "[", 
+         RowBox[{"{", 
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"0", ",", "0"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"0", ",", "1"}], "}"}], ",", 
+           RowBox[{"{", 
+            RowBox[{"1", ",", "0"}], "}"}]}], "}"}], "]"}]}]}], "]"}]}], 
+    "}"}], "\[IndentingNewLine]", "\[IndentingNewLine]", 
+   "\[IndentingNewLine]", 
+   RowBox[{"(*", " ", "D", " ", "*)"}], "\[IndentingNewLine]", 
    RowBox[{"{", 
     RowBox[{
      RowBox[{"Integrate", "[", 
@@ -484,9 +768,9 @@ Cell[BoxData[
    3.9800897254684067`*^9, 3.9800897257324524`*^9}, {3.9800898024251823`*^9, 
    3.9800898677415943`*^9}, {3.9800899711112995`*^9, 3.9800899744163017`*^9}, 
    3.9800900331185417`*^9, {3.980091788962412*^9, 3.9800918883892136`*^9}, 
-   3.980091962822172*^9, {3.9800920471595*^9, 
-   3.980092061830185*^9}},ExpressionUUID->"2c766a82-7fa4-9a47-ad4e-\
-9828d7b36062"],
+   3.980091962822172*^9, {3.9800920471595*^9, 3.980092061830185*^9}, {
+   3.980095782584078*^9, 3.9800959016652126`*^9}},
+ CellLabel->"In[70]:=",ExpressionUUID->"2c766a82-7fa4-9a47-ad4e-9828d7b36062"],
 
 Cell[BoxData[
  RowBox[{"{", 
@@ -495,9 +779,46 @@ Cell[BoxData[
    RowBox[{"-", 
     FractionBox["1", "2"]}], ",", "0", ",", 
    FractionBox["1", "2"], ",", "0", ",", "0"}], "}"}]], "Output",
- CellChangeTimes->{3.9800899754432526`*^9, 3.980091888972481*^9, 
-  3.980091963335163*^9},
- CellLabel->"Out[64]=",ExpressionUUID->"ce0d2f16-7960-e342-bccb-a5a09aa41f81"]
+ CellChangeTimes->{
+  3.9800899754432526`*^9, 3.980091888972481*^9, 3.980091963335163*^9, 
+   3.9800920644694233`*^9, {3.9800958729067955`*^9, 3.980095902565134*^9}},
+ CellLabel->"Out[70]=",ExpressionUUID->"5801fa2a-16e7-6e49-9c36-3257eaf6f092"],
+
+Cell[BoxData[
+ RowBox[{"{", 
+  RowBox[{
+   FractionBox["1", "2"], ",", "0", ",", 
+   RowBox[{"-", 
+    FractionBox["1", "2"]}], ",", "0", ",", 
+   FractionBox["1", "2"], ",", "0"}], "}"}]], "Output",
+ CellChangeTimes->{
+  3.9800899754432526`*^9, 3.980091888972481*^9, 3.980091963335163*^9, 
+   3.9800920644694233`*^9, {3.9800958729067955`*^9, 3.980095902565134*^9}},
+ CellLabel->"Out[71]=",ExpressionUUID->"7fa09739-c36c-9647-9b52-d466c132a97b"],
+
+Cell[BoxData[
+ RowBox[{"{", 
+  RowBox[{
+   FractionBox["1", "2"], ",", 
+   RowBox[{"-", 
+    FractionBox["1", "2"]}], ",", "0", ",", "0", ",", "0", ",", "0"}], 
+  "}"}]], "Output",
+ CellChangeTimes->{
+  3.9800899754432526`*^9, 3.980091888972481*^9, 3.980091963335163*^9, 
+   3.9800920644694233`*^9, {3.9800958729067955`*^9, 3.980095902565134*^9}},
+ CellLabel->"Out[72]=",ExpressionUUID->"adf8fc21-61eb-e34b-ac28-51db04f22a50"],
+
+Cell[BoxData[
+ RowBox[{"{", 
+  RowBox[{
+   FractionBox["1", "2"], ",", "0", ",", 
+   RowBox[{"-", 
+    FractionBox["1", "2"]}], ",", "0", ",", "0", ",", 
+   FractionBox["1", "2"]}], "}"}]], "Output",
+ CellChangeTimes->{
+  3.9800899754432526`*^9, 3.980091888972481*^9, 3.980091963335163*^9, 
+   3.9800920644694233`*^9, {3.9800958729067955`*^9, 3.980095902585951*^9}},
+ CellLabel->"Out[73]=",ExpressionUUID->"8fc661e3-a220-d14f-82ca-0727fa875fd3"]
 }, Open  ]]
 },
 WindowSize->{960, 532},
@@ -522,8 +843,11 @@ Cell[576, 22, 4850, 146, 218, "Input",ExpressionUUID->"0df2ca89-2727-dc49-81ba-c
 Cell[5429, 170, 497, 12, 45, "Output",ExpressionUUID->"9b0b34b7-6337-e946-b776-c094cb5e2fae"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[5963, 187, 10275, 301, 275, "Input",ExpressionUUID->"2c766a82-7fa4-9a47-ad4e-9828d7b36062"],
-Cell[16241, 490, 369, 9, 45, "Output",ExpressionUUID->"ce0d2f16-7960-e342-bccb-a5a09aa41f81"]
+Cell[5963, 187, 20005, 585, 637, "Input",ExpressionUUID->"2c766a82-7fa4-9a47-ad4e-9828d7b36062"],
+Cell[25971, 774, 445, 10, 45, "Output",ExpressionUUID->"5801fa2a-16e7-6e49-9c36-3257eaf6f092"],
+Cell[26419, 786, 445, 10, 45, "Output",ExpressionUUID->"7fa09739-c36c-9647-9b52-d466c132a97b"],
+Cell[26867, 798, 426, 10, 45, "Output",ExpressionUUID->"adf8fc21-61eb-e34b-ac28-51db04f22a50"],
+Cell[27296, 810, 445, 10, 45, "Output",ExpressionUUID->"8fc661e3-a220-d14f-82ca-0727fa875fd3"]
 }, Open  ]]
 }
 ]

@@ -20,35 +20,33 @@ if __name__ == '__main__':
     # dt = 1e-6
     # time_integrator = '1si'
 
-    # # 1ST ORDER STABILIZED SI SCHEME
-    # dt = 1e-5
-    # time_integrator = '1ssi'
+    # 1ST ORDER STABILIZED SI SCHEME
+    dt = 1e-5
+    time_integrator = '1ssi'
 
     
     # # 2ND ORDER STABILIZED SI SCHEME
     # dt = 1e-4
     # time_integrator = '2ssi'
 
-    dt = 1e-6
+    # dt = 1e-5
     ###################################################
     # General Parameters
     epsilon = 0.01
     
-    tEnd = dt*10
-    # tEnd = 1e-3
-    # tEnd = 5e-3
+    # tEnd = dt*10
+    tEnd = 1e-3
+    tEnd = 5e-3
     a = b = 1
 
     n = 4
     def c0(x,y): return np.cos(np.pi/a*x)*np.sin(np.pi/(b*n)*y)
     def c0(x,y): return np.cos(2*np.pi/(a)*n*x)*np.sin(2*np.pi/(b)*n*y)
-    # def c0(x,y): return np.random.random((len(x),))*2 - 1.0
+    def c0(x,y): return np.random.random((len(x),))*2 - 1.0
 
     # Nonlinear solver
     sol = CahnHilliardSolver2D.rectangular_domain(epsilon, a, b, mesh_size=0.02)
     sol.solve(c0, tEnd, dt, time_integrator=time_integrator)
-
-
 
 
 
@@ -58,6 +56,8 @@ if __name__ == '__main__':
     fig, ax = plt.subplots(1,2, constrained_layout = True)
     tcf1, _ = sol.plot_solution(sol.sol_c[0],  ax= ax[0])
     tcf2, _ = sol.plot_solution(sol.sol_c[-1], ax= ax[1])
+    ax[0].set_title('Starting solution')
+    ax[1].set_title('Ending solution')
 
     cbar = fig.colorbar(
         tcf2,
@@ -69,18 +69,18 @@ if __name__ == '__main__':
     cbar.set_ticks(np.linspace(-1,1, 5))  # fewer ticks → more spacing
     
     
-    fig, ax = plt.subplots(1,2, constrained_layout = True)
-    tcf1, levels1 = sol.plot_solution(sol.sol_w[0],  ax= ax[0])
-    tcf2, levels2 = sol.plot_solution(sol.sol_w[-1], ax= ax[1])
+    # fig, ax = plt.subplots(1,2, constrained_layout = True)
+    # tcf1, levels1 = sol.plot_solution(sol.sol_w[0],  ax= ax[0])
+    # tcf2, levels2 = sol.plot_solution(sol.sol_w[-1], ax= ax[1])
 
-    cbar = fig.colorbar(
-        tcf2,
-        ax=ax,
-        orientation="horizontal",
-        fraction=0.05,   # thickness of colorbar
-        # pad=0.15         # distance from subplots
-    )
-    cbar.set_ticks(np.linspace(levels2[0],levels2[-1], 5))  # fewer ticks → more spacing
+    # cbar = fig.colorbar(
+    #     tcf2,
+    #     ax=ax,
+    #     orientation="horizontal",
+    #     fraction=0.05,   # thickness of colorbar
+    #     # pad=0.15         # distance from subplots
+    # )
+    # cbar.set_ticks(np.linspace(levels2[0],levels2[-1], 5))  # fewer ticks → more spacing
     
 
 
@@ -104,6 +104,6 @@ if __name__ == '__main__':
 
 
 
-    sol.animate_solution()
+    # sol.animate_solution(fps = 10)
 
     plt.show()
