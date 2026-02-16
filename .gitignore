@@ -4,7 +4,7 @@
 *.pyo
 
 # ignore solution files
-**/*solution/
+**/*solution*/
 
 # ignore vtk files
 *.vtk

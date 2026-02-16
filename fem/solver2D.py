@@ -1,4 +1,6 @@
-import pygmsh, os
+import pygmsh, os, h5py
+from datetime import timezone, datetime
+from pathlib import Path
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
@@ -272,52 +274,122 @@ class CahnHilliardSolver2D:
         if ax is None:
             ax = plt.gca()  
             
-        vmin = kwargs.get('vmin', np.floor(np.nanmin(z)))
-        vmax = kwargs.get('vmax', np.ceil(np.nanmax(z)))
-        
+        vmin = kwargs.get('vmin', min(np.nanmin(z), -1.0))
+        vmax = kwargs.get('vmax', max(np.nanmax(z), 1.0))
+        print(vmin, vmax)
         levels = np.linspace(vmin, vmax, levels)
         tcf = ax.tricontourf(self.__tri, z, levels, cmap = cmap)
         if plot_mesh:
             self.plot_mesh(ax=ax, **kwargs)
         return tcf, levels
 
-    def animate_solution(self, fps = 10, cmap = 'jet', levels = 100,  out_path="gifs/tricontourf_animation.gif"):
-        
-        levels = np.linspace(-1, 1, levels)
+    def animate_solution(self, vector = 'c', fps = 5, cmap = 'jet', levels = 100, filename = None, directory = None):
 
-        # figure
+        if vector == 'c':
+            v = self.sol_c
+        elif v == 'w':
+            vector = self.sol_w
+        else:
+            RuntimeError()
+        
+        if filename is None:
+            filename = self.simulation_name + "_gif_" + vector 
+
+        # Ensure extension
+        if not filename.endswith(".gif"):
+            filename += ".gif"
+        
+        # Determine directory
+        if directory is None:
+            directory = Path.cwd() / "solution2D"
+        else:
+            directory = Path(directory)
+
+        # Create directory if it does not exist
+        directory.mkdir(parents=True, exist_ok=True)
+        filepath = directory / filename
+
         fig, ax = plt.subplots(figsize=(6, 4))
         ax.set_title("tricontourf GIF example")
 
-        tcf = ax.tricontourf(self.__tri, self.sol_c[0], levels, cmap = cmap)
+        tcf = ax.tricontourf(self.__tri, v[0], levels, cmap = cmap)
         ax.set_title(f"Tme step: 0")
         cbar = fig.colorbar(tcf, ax=ax)
         
         def update(i):
             ax.clear()
-            tcf = ax.tricontourf(self.__tri, self.sol_c[i], levels=levels, cmap = cmap)
+            tcf = ax.tricontourf(self.__tri, v[i], levels=levels, cmap = cmap)
+            cbar = fig.colorbar(tcf, ax=ax)
             ax.set_title(f"Tme step: {i}")
             return tcf
-
-        out_dir = os.path.dirname(out_path)
-        if out_dir:
-            os.makedirs(out_dir, exist_ok=True)
-            anim = FuncAnimation(fig, update, frames=self.__nt, interval=100, blit=False)
+        
+        anim = FuncAnimation(fig, update, frames=self.__nt, interval=100, blit=False)
 
         # Save as GIF
         writer = PillowWriter(fps=fps)   # frames per second
         # pbar = tqdm(total= self.__nt, leave= LEAVE_TQDM_BAR, desc= "Animating solution:")
-        pbar = _progress_range(range(self.__nt), "Animating solution")
+        pbar = _progress_range(range(self.__nt), f"Animating '{vector}' solution")
         
         def progress(i, n):
             pbar.update(1)
-        try:
-            anim.save(out_path,writer=writer,dpi=150,progress_callback=progress)
-        finally:
-            pbar.close()
-        tqdm.write(f"File saved successfully: {out_path}\n")
+        
+        anim.save(filepath,writer=writer,dpi=150,progress_callback=progress)
+        tqdm.write(f"File saved successfully: {filepath}\n")
         plt.close(fig)
         
+    
+    def save(self, filename = None, directory = None, append_time = False):
+        if filename is None:
+            filename = self.simulation_name
+
+        if append_time:
+            filename += "_" + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
+
+        # Ensure extension
+        if not filename.endswith(".h5"):
+            filename += ".h5"
+        
+        # Determine directory
+        if directory is None:
+            directory = Path.cwd() / "solution2D"
+        else:
+            directory = Path(directory)
+
+        # Create directory if it does not exist
+        directory.mkdir(parents=True, exist_ok=True)
+        filepath = directory / filename
+
+        with h5py.File(filepath, "w") as f:
+            sol_grp = f.create_group("solution")
+            
+            # -----------------
+            # Save arrays
+            # -----------------
+            arr_grp = sol_grp.create_group("arrays")
+            for name, array in zip(['sol_c', 'sol_w', 't', 'mass', 'energy', 'nodes', 'connectivity'], [self.sol_c, self.sol_w, self.t, self.__mass, self.__energy, self.__nodes, self.__connectivity]):
+                arr_grp.create_dataset(
+                    name,
+                    data=array,
+                    compression="gzip",
+                    compression_opts=4,
+                    shuffle=True
+            )
+
+
+            # -----------------
+            # Save scalars
+            # -----------------
+            scal_grp = sol_grp.create_group("scalars")
+            for name, value in zip(['Ne', 'N', 'dt', 'T'], [self.__Ne, self.__N, self.__dt, self.__T]):
+                scal_grp.create_dataset(name, data=value)
+
+            # -----------------
+            # Save metadata
+            # -----------------
+            sol_grp.attrs["saved_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
+        
+        print("Simulation successfully saved as : {}".format(filepath))
+
     #####################################################################
     # HELPER FUNCTIONS
     
@@ -408,3 +480,11 @@ class CahnHilliardSolver2D:
         """Energy"""
         return self.__energy
     
+    @property
+    def tri(self):
+        """Triangulations object"""
+        return self.__tri
+    
+    @property
+    def simulation_name(self):
+        return f"Cahn_Hilliard2D_solution_{self.__solver_name}_Ne{self.Ne}_T{self.__T:.1e}_dt{self.__dt:.1e}"
