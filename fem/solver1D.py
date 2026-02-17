@@ -191,7 +191,7 @@ class CahnHilliardSolver1D():
         """Explicit time stepping"""
         # Precompute LU factorisation of Mass matrix
         lu = linalg.splu(self.M)
-        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
+        for it in _progress_range(range(1,self.__nt), desc = "\nSimulation running"):
             self.__u[it] = self._step_explicit(self.__u[it-1], lu)
 
             flag = self.__checks(it)
@@ -234,7 +234,7 @@ class CahnHilliardSolver1D():
             return bmat([[self.M/self.__dt, self.K],
                         [ck, self.M]], format = 'csc')
 
-        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
+        for it in _progress_range(range(1,self.__nt), desc = "\nSimulation running"):
             self.__u[it] = self._NewtonRaphson(self.__u[it-1], Jac, Residual, **self.__nonlinear_solver_parameters)
 
             flag = self.__checks(it)
@@ -263,7 +263,7 @@ class CahnHilliardSolver1D():
             return bmat([[self.M/self.__dt, self.K],
                         [ck,                self.M]], format = 'csc')
 
-        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
+        for it in _progress_range(range(1,self.__nt), desc = "\nSimulation running"):
             self.__u[it] = self._NewtonRaphson(self.__u[it-1], Jac, Residual, **self.__nonlinear_solver_parameters)
             
             flag = self.__checks(it)
@@ -303,7 +303,7 @@ class CahnHilliardSolver1D():
         b = np.zeros((self.__N*2,))
 
         lu = linalg.splu(A)
-        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
+        for it in _progress_range(range(1,self.__nt), desc = "\nSimulation running"):
             # Update RHS
             self.__update_rhs_B(b, self.__u[it-1,:self.__N])
             
@@ -342,7 +342,7 @@ class CahnHilliardSolver1D():
         
         # Pre-compute LU factorisation
         lu = linalg.splu(A)
-        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
+        for it in _progress_range(range(1,self.__nt), desc = "\nSimulation running"):
             # Update RHS
             self.__update_rhs_1SI(b, self.__u[it-1,:self.__N])
             
@@ -384,7 +384,7 @@ class CahnHilliardSolver1D():
         
         # Pre-compute LU factorisation
         lu = linalg.splu(A)
-        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
+        for it in _progress_range(range(1,self.__nt), desc = "\nSimulation running"):
             # Update RHS
             self.__update_rhs_1SSI(b, self.__u[it-1,:self.__N], STABILIZATION_CONSTANT)
             
@@ -445,7 +445,7 @@ class CahnHilliardSolver1D():
                   [self.M,  2/3*self.__dt*self.K]], format='csc')
         lu = linalg.splu(A)
         
-        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
+        for it in _progress_range(range(2,self.__nt), desc = "\nSimulation running"):
             # Update RHS
             self.__update_rhs_2SSI(b, self.__u[it-2,:self.__N], self.__u[it-1,:self.__N], STABILIZATION_CONSTANT)
             
@@ -668,7 +668,7 @@ class CahnHilliardSolver1D():
             # -----------------
             sol_grp.attrs["saved_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
         
-        print("Simulation successfully saved as : {}".format(filepath))
+        print("\nSimulation successfully saved as : {}".format(filepath))
     ######################################################
     # PROPERTIES
 
