@@ -50,7 +50,16 @@ except ModuleNotFoundError:
             else:
                 sys.stdout.write("\r")
             sys.stdout.flush()
-
+        
+        def close(self):
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+        
+        def write(str):
+            sys.stdout.write("\n" + str)
+            sys.stdout.flush()
+        
+        
 
 def _progress_range(iterable, desc=None):
     return tqdm(

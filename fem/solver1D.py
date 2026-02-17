@@ -5,11 +5,10 @@ import h5py, json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tqdm import tqdm
 from scipy.sparse import csc_matrix, bmat
 import scipy.sparse.linalg as linalg
 
-from ._config import STABILIZATION_CONSTANT
+from ._config import _progress_range, STABILIZATION_CONSTANT, tqdm
 from ._elements import _LegendreElement, LinearLegendreElement, QuadraticLegendreElement
 
 
@@ -113,6 +112,7 @@ class CahnHilliardSolver1D():
         # TIME STEPPING
         # return
         _time_stepper()
+        tqdm.write("Simulation ended.")
 
 
 
@@ -191,7 +191,7 @@ class CahnHilliardSolver1D():
         """Explicit time stepping"""
         # Precompute LU factorisation of Mass matrix
         lu = linalg.splu(self.M)
-        for it in tqdm(range(1,self.__nt)):
+        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
             self.__u[it] = self._step_explicit(self.__u[it-1], lu)
 
             flag = self.__checks(it)
@@ -234,7 +234,7 @@ class CahnHilliardSolver1D():
             return bmat([[self.M/self.__dt, self.K],
                         [ck, self.M]], format = 'csc')
 
-        for it in tqdm(range(1,self.__nt)):
+        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
             self.__u[it] = self._NewtonRaphson(self.__u[it-1], Jac, Residual, **self.__nonlinear_solver_parameters)
 
             flag = self.__checks(it)
@@ -263,7 +263,7 @@ class CahnHilliardSolver1D():
             return bmat([[self.M/self.__dt, self.K],
                         [ck,                self.M]], format = 'csc')
 
-        for it in range(1,self.__nt):
+        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
             self.__u[it] = self._NewtonRaphson(self.__u[it-1], Jac, Residual, **self.__nonlinear_solver_parameters)
             
             flag = self.__checks(it)
@@ -303,7 +303,7 @@ class CahnHilliardSolver1D():
         b = np.zeros((self.__N*2,))
 
         lu = linalg.splu(A)
-        for it in tqdm(range(1,self.__nt)):
+        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
             # Update RHS
             self.__update_rhs_B(b, self.__u[it-1,:self.__N])
             
@@ -342,7 +342,7 @@ class CahnHilliardSolver1D():
         
         # Pre-compute LU factorisation
         lu = linalg.splu(A)
-        for it in tqdm(range(1,self.__nt)):
+        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
             # Update RHS
             self.__update_rhs_1SI(b, self.__u[it-1,:self.__N])
             
@@ -384,12 +384,13 @@ class CahnHilliardSolver1D():
         
         # Pre-compute LU factorisation
         lu = linalg.splu(A)
-        for it in tqdm(range(1,self.__nt)):
+        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
             # Update RHS
             self.__update_rhs_1SSI(b, self.__u[it-1,:self.__N], STABILIZATION_CONSTANT)
             
             # SOLVE
             self.__u[it] = lu.solve(b)
+            # self.__u[it] = linalg.cg(A, b)
 
             flag = self.__checks(it)
 
@@ -444,7 +445,7 @@ class CahnHilliardSolver1D():
                   [self.M,  2/3*self.__dt*self.K]], format='csc')
         lu = linalg.splu(A)
         
-        for it in tqdm(range(2,self.__nt)):
+        for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
             # Update RHS
             self.__update_rhs_2SSI(b, self.__u[it-2,:self.__N], self.__u[it-1,:self.__N], STABILIZATION_CONSTANT)
             

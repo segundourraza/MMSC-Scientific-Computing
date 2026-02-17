@@ -6,5 +6,8 @@
 # ignore solution files
 **/*solution*/
 
+# ignore gifs
+**/gifs
+
 # ignore vtk files
 *.vtk

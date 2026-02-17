@@ -9,10 +9,11 @@ np.set_printoptions(linewidth = 240)
 if __name__ == '__main__':
 
     ############################################################
-    # TIME STEPPERS AND APPRORPIATE PARAMETERS
+    # TIME STEPPERS AND APPROPRIATE PARAMETERS
 
     # Semi implicit CASE B
-    dt = 1e-4
+    mesh_size = 0.02
+    dt = 1e-5
     time_integrator = 3
 
 
@@ -30,30 +31,35 @@ if __name__ == '__main__':
     # dt = 1e-4
     # time_integrator = '2ssi'
 
-    # dt = 1e-5
+    # dt = 1e-6
     ###################################################
     # General Parameters
     epsilon = 0.01
     
-    tEnd = dt*10
-    # tEnd = 1e-3
-    tEnd = 5e-3
+    # tEnd = dt*10
+    tEnd = 1e-3
+    # tEnd = 5e-3
     a = b = 1
 
     n = 4
     def c0(x,y): return np.cos(np.pi/a*x)*np.sin(np.pi/(b*n)*y)
     def c0(x,y): return np.cos(2*np.pi/(a)*n*x)*np.sin(2*np.pi/(b)*n*y)
     
-    np.random.default_rng(0)
-    def c0(x,y): return np.random.uniform(-1.0, 1, (len(x),))
+    # np.random.default_rng(0)
+    # def c0(x,y): return np.random.uniform(-1.0, 1, (len(x),))
 
     # Nonlinear solver
+
+
     sol = CahnHilliardSolver2D.rectangular_domain(epsilon, a, b, mesh_size=mesh_size)
+    # sol.plot_mesh()
+    
     sol.solve(c0, tEnd, dt, time_integrator=time_integrator)
     
-    sol.animate_solution(vector = 'c', fps = 10)
-    sol.animate_solution(vector = 'w', fps = 10)
     sol.save()
+    
+    sol.animate_solution(vector = 'c', fps = 10)
+    # sol.animate_solution(vector = 'w', fps = 10)
 
 
     #######################################################

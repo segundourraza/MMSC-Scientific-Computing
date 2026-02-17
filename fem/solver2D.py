@@ -1,7 +1,6 @@
 import pygmsh, os, h5py
 from datetime import timezone, datetime
 from pathlib import Path
-from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.tri import Triangulation
@@ -10,7 +9,7 @@ import scipy.sparse.linalg as linalg
 from matplotlib.animation import FuncAnimation, PillowWriter
 
 from ._elements import LinearTriangularElement
-from ._config import _progress_range, LEAVE_TQDM_BAR, STABILIZATION_CONSTANT
+from ._config import _progress_range, STABILIZATION_CONSTANT, tqdm
 
 TIME_INTEGRATOR_STR2INT_MAP = {
                                 'implicit': 1,
@@ -126,8 +125,8 @@ class CahnHilliardSolver2D:
         ################################################
         # TIME STEPPING
         # return
-        _time_stepper()
-        tqdm.write("Simulation ended.\n")
+        self.__termination_flag = _time_stepper()
+        tqdm.write("Simulation ended.")
         
     
     
@@ -159,7 +158,8 @@ class CahnHilliardSolver2D:
             flag = self.__checks(it)
 
             if flag != 0:
-                return self.__u[:it-1,:]
+                return 1
+        return 0 
         
     def __update_rhs_B(self, b, evaluation_C):
         """Assemble non-linear vector for semi implicit B"""
@@ -283,12 +283,12 @@ class CahnHilliardSolver2D:
             self.plot_mesh(ax=ax, **kwargs)
         return tcf, levels
 
-    def animate_solution(self, vector = 'c', fps = 5, cmap = 'jet', levels = 100, filename = None, directory = None):
+    def animate_solution(self, vector = 'c', fps = 10, cmap = 'jet', levels = 100, filename = None, directory = None):
 
         if vector == 'c':
             v = self.sol_c
-        elif v == 'w':
-            vector = self.sol_w
+        elif vector == 'w':
+            v = self.sol_w
         else:
             RuntimeError()
         
@@ -301,7 +301,7 @@ class CahnHilliardSolver2D:
         
         # Determine directory
         if directory is None:
-            directory = Path.cwd() / "solution2D"
+            directory = Path.cwd() / "gifs"
         else:
             directory = Path(directory)
 
@@ -319,8 +319,9 @@ class CahnHilliardSolver2D:
         def update(i):
             ax.clear()
             tcf = ax.tricontourf(self.__tri, v[i], levels=levels, cmap = cmap)
-            cbar = fig.colorbar(tcf, ax=ax)
-            ax.set_title(f"Tme step: {i}")
+            cbar.update_normal(tcf)
+
+            ax.set_title(f"Time step: {i}")
             return tcf
         
         anim = FuncAnimation(fig, update, frames=self.__nt, interval=100, blit=False)
@@ -334,6 +335,7 @@ class CahnHilliardSolver2D:
             pbar.update(1)
         
         anim.save(filepath,writer=writer,dpi=150,progress_callback=progress)
+        pbar.close()
         tqdm.write(f"File saved successfully: {filepath}\n")
         plt.close(fig)
         
@@ -388,7 +390,7 @@ class CahnHilliardSolver2D:
             # -----------------
             sol_grp.attrs["saved_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
         
-        print("Simulation successfully saved as : {}".format(filepath))
+        print("\nSimulation successfully saved as : {}".format(filepath))
 
     #####################################################################
     # HELPER FUNCTIONS
@@ -400,7 +402,10 @@ class CahnHilliardSolver2D:
         return M
     
     def __compute_energy(self, u):
-        return 1
+        E = 0
+        for e, con in enumerate(self.__connectivity):
+            E += self.element.compute_energy(self.__detJ[e], self.__InvJ[e], u[con], self.epsilon)
+        return E
     
     def __checks(self, it):
         # Compute Conserved quantities
@@ -432,6 +437,11 @@ class CahnHilliardSolver2D:
     
     ######################################################
     # PROPERTIES
+
+    @property
+    def dt(self):
+        """time step"""
+        return self.__dt
 
     @property
     def nt(self):

@@ -31,7 +31,7 @@ def load_solution_hdf5(filepath):
     return arrays, scalars
 
     
-def analyzer_contours(file_name, nt, levels = 100, cmap = 'jet', fp = Path.cwd() / "solution2D"):
+def analyzer_contours(file_name, nt, plot_mesh = False, levels = 100, cmap = 'jet', fp = Path.cwd() / "solution2D"):
 
     
     # COMPARISON OF 1st ORDER STABILIZED SEMI IMPLICIT METHOD    
@@ -43,14 +43,11 @@ def analyzer_contours(file_name, nt, levels = 100, cmap = 'jet', fp = Path.cwd()
     ax[0].set_yscale('log')
 
     tri = Triangulation(arrays['nodes'][:,0], arrays['nodes'][:,1], arrays['connectivity'])
-    print(np.shape(arrays['nodes']))
-    print(np.shape(arrays['sol_c']))
         
     #####################################################
     # CONTOUR PLOT C
     vmin = min(np.nanmin(d) for d in arrays['sol_c'][[0,nt]])
     vmax = max(np.nanmax(d) for d in arrays['sol_c'][[0,nt]])
-    print(vmin, vmax)
     
     fig2, ax2 = plt.subplots(1,2, sharey=True)
     fig2.subplots_adjust(wspace=0.05)
@@ -58,8 +55,12 @@ def analyzer_contours(file_name, nt, levels = 100, cmap = 'jet', fp = Path.cwd()
     
     cf = ax2[0].tricontourf(tri, arrays['sol_c'][0] , vmin = vmin, vmax = vmax, levels = levels, cmap = cmap)
     cf = ax2[1].tricontourf(tri, arrays['sol_c'][nt], vmin = vmin, vmax = vmax, levels = levels, cmap = cmap)
+    if plot_mesh:
+        ax2[0].triplot(tri, linewidth = 0.5, color = 'k')
+        ax2[1].triplot(tri, linewidth = 0.5, color = 'k')
+        
     ax2[0].set_title(f"Starting Solution", fontsize = 10)
-    ax2[1].set_title(f"Time step = {nt}", fontsize = 10)
+    ax2[1].set_title(f"Time = {arrays['t'][nt]:.2e}", fontsize = 10)
     for ax in ax2:
         ax.set_xlim(right = 0.99*ax.get_xlim()[1])
         ax.set_xlabel("x")
@@ -87,9 +88,12 @@ def analyzer_contours(file_name, nt, levels = 100, cmap = 'jet', fp = Path.cwd()
     fig3.colorbar(cf, ax=ax3[0], location='left')
     cf = ax3[1].tricontourf(tri, arrays['sol_w'][nt], levels = levels, cmap = cmap)
     fig3.colorbar(cf, ax=ax3[1], location='right')
-    
+    if plot_mesh:
+        ax3[0].triplot(tri, linewidth = 0.5, color = 'k')
+        ax3[1].triplot(tri, linewidth = 0.5, color = 'k')
+
     ax3[0].set_title(f"Starting Solution", fontsize = 10)
-    ax3[1].set_title(f"Time step = {nt}", fontsize = 10)
+    ax3[1].set_title(f"Time = {arrays['t'][nt]:.2e}", fontsize = 10)
     for ax in ax3:
         ax.set_xlim(right = 0.99*ax.get_xlim()[1])
         ax.set_xlabel("x")
@@ -192,7 +196,7 @@ def analyzer_space_complexity(prefix, dt,fp = Path.cwd() / "solution"):
 if __name__ == '__main__':
     
     filename = "Cahn_Hilliard2D_solution_1ssi_Ne5824_T5.0e-03_dt1.0e-05.h5"
-    analyzer_contours(filename, nt = -1)
+    analyzer_contours(filename, nt = -1, plot_mesh=True)
     
 
 

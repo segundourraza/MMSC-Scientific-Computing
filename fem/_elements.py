@@ -272,6 +272,26 @@ class LinearTriangularElement():
                 b_global[con[i]] += ch3*phi[i]*(detJ)*wi
 
 
+    def compute_energy(self, detJ, invJ, Ce, eps):
+        E = 0
+        for (xi, eta), wi in zip(*triangle_quadrature(6)):
+            phi = self.basis_functions(xi, eta)
+            ch2 = np.dot(Ce, phi)**2
+
+            grad_phi = self.grad_basis_function(xi, eta)
+            
+            dcdx = np.dot(Ce, [[invJ[0,0]*grad_phi[0][0] + invJ[0,1]*grad_phi[0][1]],
+                               [invJ[0,0]*grad_phi[1][0] + invJ[0,1]*grad_phi[1][1]],
+                               [invJ[0,0]*grad_phi[2][0] + invJ[0,1]*grad_phi[2][1]]])**2
+            dcdy = np.dot(Ce, [[invJ[1,0]*grad_phi[0][0] + invJ[1,1]*grad_phi[0][1]],
+                               [invJ[1,0]*grad_phi[1][0] + invJ[1,1]*grad_phi[1][1]],
+                               [invJ[1,0]*grad_phi[2][0] + invJ[1,1]*grad_phi[2][1]]])**2
+
+            grad_c_norm2 = dcdx + dcdy
+            E += (1/(4*eps)*(1- ch2**2)**2 + eps/2*grad_c_norm2)*(detJ)*wi
+        return E
+
+
 
 
     @staticmethod
@@ -279,7 +299,14 @@ class LinearTriangularElement():
         return [1 - xi - eta, xi, eta]
     
     @staticmethod
+    def grad_basis_function(xi, eta):
+        return [[-1, -1],
+                [1, 0],
+                [0, 1]]
+    
+    @staticmethod
     def compute_mass_e(area, Ce):
         return area*np.sum(Ce)/3
     
+
 

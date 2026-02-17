@@ -29,25 +29,25 @@ if __name__ == '__main__':
     time_integrator = 3
 
 
-    # # 1ST ORDER SI SCHEME
+    # # 1ST ORDER SEMI IMPLICIT SCHEME
     # dt = 1e-6
     # time_integrator = '1si'
 
-    # 1ST ORDER STABILIZED SI SCHEME
+    # 1ST ORDER STABILIZED SEMI IMPLICIT SCHEME
     dt = 1e-5
     time_integrator = '1ssi'
 
     
-    # # 2ND ORDER STABILIZED SI SCHEME
-    # dt = 1e-4
-    # time_integrator = '2ssi'
+    # 2ND ORDER STABILIZED SEMI IMPLICIT SCHEME
+    dt = 1e-5
+    time_integrator = '2ssi'
 
 
     ###################################################
     # General Parameters
     epsilon = 0.01
     L = 1
-    poly_degree = 2
+    poly_degree = 1
     
     # Initial conditions
     def c0(x): return np.cos(np.pi/L*x)
@@ -57,26 +57,35 @@ if __name__ == '__main__':
     tEnd = 1e-3
     # tEnd = 5e-3
     
-    
-    
-    for N in [4, 10, 50, 100, 500, 1000, 5000]:
-        # Nonlinear solver
-        sol = CahnHilliardSolver1D(epsilon, 
-                                number_of_elements=N, L = L, 
-                                polynomial_order=poly_degree)
-        
-        nonlinear_solver_options = {'run_checks': False,
-                            #  'line_search': 'armijo',
-                            #  'relaxation_parameter': 0.8,
-                            'verbose' : False,
-                            }
-        sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
-        sol.save()
 
-    # dts = [1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7]
-    # for dt in dts:
+    # for N in [4, 10, 50, 100, 500, 1000, 5000]:
+    #   v  # Nonlinear solver
+    #     sol = CahnHilliardSolver1D(epsilon, 
+    #                             number_of_elements=N, L = L, 
+    #                             polynomial_order=poly_degree)
+        
+    #     nonlinear_solver_options = {'run_checks': False,
+    #                         #  'line_search': 'armijo',
+    #                         #  'relaxation_parameter': 0.8,
+    #                         'verbose' : False,
+    #                         }
     #     sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
     #     sol.save()
+
+
+    N = 100
+    sol = CahnHilliardSolver1D(epsilon, 
+                                number_of_elements=N, L = L, 
+                                polynomial_order=poly_degree)        
+    nonlinear_solver_options = {'run_checks': False,
+                        #  'line_search': 'armijo',
+                        #  'relaxation_parameter': 0.8,
+                        'verbose' : False,
+                        }
+    dts = [1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7]    
+    for dt in dts:
+        sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
+        sol.save()
 
     ###############################################################
     #  PLOTTING
