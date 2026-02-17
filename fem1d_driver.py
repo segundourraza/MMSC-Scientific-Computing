@@ -47,7 +47,7 @@ if __name__ == '__main__':
     # General Parameters
     epsilon = 0.01
     L = 1
-    poly_degree = 1
+    poly_degree = 2
     
     # Initial conditions
     def c0(x): return np.cos(np.pi/L*x)
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     
 
     # for N in [4, 10, 50, 100, 500, 1000, 5000]:
-    #   v  # Nonlinear solver
+    #     # Nonlinear solver
     #     sol = CahnHilliardSolver1D(epsilon, 
     #                             number_of_elements=N, L = L, 
     #                             polynomial_order=poly_degree)
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     #                         'verbose' : False,
     #                         }
     #     sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
-    #     sol.save()
+    #     # sol.save()
 
 
     N = 100
@@ -83,9 +83,10 @@ if __name__ == '__main__':
                         'verbose' : False,
                         }
     dts = [1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7]    
+    dts = dts[:1]
     for dt in dts:
         sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
-        sol.save()
+        # sol.save()
 
     ###############################################################
     #  PLOTTING

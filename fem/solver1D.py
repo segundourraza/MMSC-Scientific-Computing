@@ -102,8 +102,8 @@ class CahnHilliardSolver1D():
         self.__u[0,self.N:] = linalg.spsolve(self.M, b)
         
         # CONSERVED QUANTITIES
-        self.__mass = np.empty((self.__nt,), dtype=float)
-        self.__J = np.empty((self.__nt,), dtype=float)
+        self.__mass = np.zeros((self.__nt,), dtype=float)
+        self.__J = np.zeros((self.__nt,), dtype=float)
         self.__mass[0] = self.__compute_mass(self.__u[0])
         self.__J[0] = self.__compute_J(self.__u[0])
 
@@ -223,7 +223,7 @@ class CahnHilliardSolver1D():
     def _implicit(self):
         """Implicit time stepping"""
         def Residual(u_prev, u):
-            res = np.empty((2*self.__N))
+            res = np.zeros((2*self.__N))
             res[:self.__N] = 1/self.__dt * (self.M@(u[:self.__N] - u_prev[:self.__N])) + self.K@u[self.__N:]
             res[self.__N:] = self.M@u[self.__N:] - self.epsilon*(self.K@u[:self.__N]) - (1.0/self.epsilon)*self.__assemble_N(u[:self.__N])
             return res

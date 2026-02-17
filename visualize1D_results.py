@@ -139,6 +139,8 @@ def result_analyzer(prefix, period, fp = Path.cwd() / 'solution'):
         fig3.tight_layout()
 
 
+    ##########################################
+    # COMPLEXITY PLOT
 
     ##########################################
     # SPATIAL COMPLEXITY ANALYSIS
@@ -147,18 +149,18 @@ def result_analyzer(prefix, period, fp = Path.cwd() / 'solution'):
         arrays, scalars = load_solution_hdf5(fp / name)
         # COMPLEXITY DATA
         if arrays['t'][-1] == scalars['T']:
-            complexity_data.append([scalars['Ne'], arrays['sol_c'][-1,:]])
+            complexity_data.append([scalars['Ne'], arrays['sol_c'][-1][-1]])
     if len(complexity_data) < 2:
         print('\nNot enough data to do a spatial complexity analysis')
     else:
-        # COMPLEXITY PLOT
+        # # COMPLEXITY PLOT
         ne, complexity_data = zip(*sorted(complexity_data))
         ne = np.array(ne[:-1])
+        error = np.array([abs(_ - complexity_data[-1]) for _ in complexity_data[:-1]])
 
-        error = np.array([np.linalg.norm(_[0] - complexity_data[-1][0]) for _ in complexity_data[:-1]])
-        
         ne_crit = 1/(2*np.sqrt(2)/9 *np.arctanh(0.95)*0.01)
-        id2 = sorted([i for i, v in enumerate(ne) if v < ne_crit], key=lambda i: ne[i])
+        # id2 = sorted([i for i, v in enumerate(ne) if v < ne_crit], key=lambda i: ne[i])
+        id2 = range(len(ne))
         
         fig3, ax3 = plt.subplots()
         ax3.loglog(ne, error, '-s')
@@ -274,7 +276,6 @@ def result_visualizer(prefix, period, levels = 100, cmap = 'jet', fp = Path.cwd(
     
     fcontour_data = []
     fig1, ax1 = plt.subplots(1,2)
-    print(dt_ch[0])
     fig1.suptitle(f"Fix $\\Delta t$={dt_ch[0]:.2e}, Varying Ne")
     for i,name in enumerate(v for k,v in grouped_files.items() if k[1] in dt_ch):
         arrays, scalars = load_solution_hdf5(fp / name)
@@ -378,11 +379,11 @@ if __name__ == '__main__':
     
     
     prefix = "Cahn_Hilliard_solution_b_CG1"
-    # prefix = "Cahn_Hilliard_solution_1si_CG1"
-    # prefix = "Cahn_Hilliard_solution_1ssi_CG1"
-    # prefix = "Cahn_Hilliard_solution_1ssi_CG2"
-    # prefix = "Cahn_Hilliard_solution_2ssi_CG1"
-    # prefix = "Cahn_Hilliard_solution_2ssi_CG2"
+    prefix = "Cahn_Hilliard_solution_1si_CG1"
+    prefix = "Cahn_Hilliard_solution_1ssi_CG1"
+    prefix = "Cahn_Hilliard_solution_1ssi_CG2"
+    prefix = "Cahn_Hilliard_solution_2ssi_CG1"
+    prefix = "Cahn_Hilliard_solution_2ssi_CG2"
     period = 1e-3
     result_analyzer(prefix, period)
     # result_visualizer(prefix, period)

@@ -54,8 +54,8 @@ class CahnHilliardSolver2D:
 
         # Compute Jacobian
         self.__J = [0]*self.__Ne
-        self.__A = np.empty((self.__Ne,))
-        self.__detJ = np.empty((self.__Ne,))
+        self.__A = np.zeros((self.__Ne,))
+        self.__detJ = np.zeros((self.__Ne,))
         self.__InvJ = [0]*self.__Ne
         for e,con in enumerate(self.__connectivity):
             x1, x2, x3 = self.__nodes[con,0]
@@ -116,8 +116,8 @@ class CahnHilliardSolver2D:
         self.__u[0,self.__N:] = linalg.spsolve(self.M, b)
         
         # CONSERVED QUANTITIES
-        self.__mass = np.empty((self.__nt,), dtype=float)
-        self.__energy = np.empty((self.__nt,), dtype=float)
+        self.__mass = np.zeros((self.__nt,), dtype=float)
+        self.__energy = np.zeros((self.__nt,), dtype=float)
         self.__mass[0] = self.__compute_mass(self.__u[0])
         self.__energy[0] = self.__compute_energy(self.__u[0])
 
