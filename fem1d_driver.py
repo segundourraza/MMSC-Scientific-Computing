@@ -29,25 +29,25 @@ if __name__ == '__main__':
     time_integrator = 3
 
 
-    # # 1ST ORDER SEMI IMPLICIT SCHEME
-    # dt = 1e-6
-    # time_integrator = '1si'
+    # 1ST ORDER SEMI IMPLICIT SCHEME
+    dt = 1e-6
+    time_integrator = '1si'
 
-    # 1ST ORDER STABILIZED SEMI IMPLICIT SCHEME
-    dt = 1e-5
-    time_integrator = '1ssi'
+    # # 1ST ORDER STABILIZED SEMI IMPLICIT SCHEME
+    # dt = 1e-5
+    # time_integrator = '1ssi'
 
     
-    # 2ND ORDER STABILIZED SEMI IMPLICIT SCHEME
-    dt = 1e-5
-    time_integrator = '2ssi'
+    # # 2ND ORDER STABILIZED SEMI IMPLICIT SCHEME
+    # dt = 1e-5
+    # time_integrator = '2ssi'
 
 
     ###################################################
     # General Parameters
     epsilon = 0.01
     L = 1
-    poly_degree = 2
+    poly_degree = 1
     
     # Initial conditions
     def c0(x): return np.cos(np.pi/L*x)

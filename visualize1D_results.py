@@ -103,15 +103,18 @@ def result_analyzer(prefix, period, fp = Path.cwd() / 'solution'):
         raise RuntimeError(f"No file found with pattern: '{pattern}'")
 
     grouped_files, ne_ch, dt_ch = group_by_ne_and_dt(file_list)
+    print(dt_ch, ne_ch)
     ##########################################
     # TEMPORAL COMPLEXITY ANALYSIS
     complexity_data = []
 
     for i,name in enumerate(v for k,v in grouped_files.items() if k[0] in ne_ch):
+        
         arrays, scalars = load_solution_hdf5(fp / name)
 
         # COMPLEXITY DATA
         if arrays['t'][-1] == scalars['T']:
+            print(name)
             complexity_data.append([scalars['T']/scalars['dt'], arrays['sol_c'][-1,:]])
     
     if len(complexity_data) < 2:
@@ -380,13 +383,13 @@ if __name__ == '__main__':
     
     prefix = "Cahn_Hilliard_solution_b_CG1"
     prefix = "Cahn_Hilliard_solution_1si_CG1"
-    prefix = "Cahn_Hilliard_solution_1ssi_CG1"
-    prefix = "Cahn_Hilliard_solution_1ssi_CG2"
-    prefix = "Cahn_Hilliard_solution_2ssi_CG1"
-    prefix = "Cahn_Hilliard_solution_2ssi_CG2"
+    # prefix = "Cahn_Hilliard_solution_1ssi_CG1"
+    # prefix = "Cahn_Hilliard_solution_1ssi_CG2"
+    # prefix = "Cahn_Hilliard_solution_2ssi_CG1"
+    # prefix = "Cahn_Hilliard_solution_2ssi_CG2"
     period = 1e-3
     result_analyzer(prefix, period)
-    # result_visualizer(prefix, period)
+    result_visualizer(prefix, period)
 
     plt.show()
     
