@@ -12,7 +12,6 @@ if __name__ == '__main__':
     # TIME STEPPERS AND APPROPRIATE PARAMETERS
 
     # Semi implicit CASE B
-    mesh_size = 0.02
     dt = 1e-5
     time_integrator = 3
 
@@ -23,20 +22,22 @@ if __name__ == '__main__':
 
     # 1ST ORDER STABILIZED SI SCHEME
     dt = 1e-5
-    mesh_size = 0.02
     time_integrator = '1ssi'
 
     
-    # # 2ND ORDER STABILIZED SI SCHEME
-    # dt = 1e-4
-    # time_integrator = '2ssi'
+    # 2ND ORDER STABILIZED SI SCHEME
+    dt = 1e-5
+    time_integrator = '2ssi'
 
     # dt = 1e-6
+
+    mesh_size = 0.02
+
     ###################################################
     # General Parameters
     epsilon = 0.01
     
-    # tEnd = dt*10
+    # tEnd = dt*0
     tEnd = 1e-3
     # tEnd = 5e-3
     a = b = 1
@@ -45,21 +46,26 @@ if __name__ == '__main__':
     def c0(x,y): return np.cos(np.pi/a*x)*np.sin(np.pi/(b*n)*y)
     def c0(x,y): return np.cos(2*np.pi/(a)*n*x)*np.sin(2*np.pi/(b)*n*y)
     
-    # np.random.default_rng(0)
-    # def c0(x,y): return np.random.uniform(-1.0, 1, (len(x),))
+    np.random.default_rng(0)
+    def c0(x,y): return np.random.uniform(-1.0, 1, (len(x),))
 
     # Nonlinear solver
 
-
-    sol = CahnHilliardSolver2D.rectangular_domain(epsilon, a, b, mesh_size=mesh_size)
-    # sol.plot_mesh()
     
+    # prepend = None
+    # sol = CahnHilliardSolver2D.rectangular_domain(epsilon, a, b, mesh_size=mesh_size)
+
+    prepend = "circular"
+    sol = CahnHilliardSolver2D.generate_circular_mesh(epsilon, a, mesh_size=mesh_size)
+    
+
     sol.solve(c0, tEnd, dt, time_integrator=time_integrator)
     
-    sol.save()
+    # sol.plot_solution(sol.sol_c[-1], plot_mesh=True)
     
-    sol.animate_solution(vector = 'c', fps = 10)
-    # sol.animate_solution(vector = 'w', fps = 10)
+    sol.save(prepend=prepend)
+    sol.animate_solution(vector = 'c', fps = 10, prepend = prepend)
+    # sol.animate_solution(vector = 'w', fps = 10, filename = 'circular_' + sol.simulation_name)
 
 
     #######################################################

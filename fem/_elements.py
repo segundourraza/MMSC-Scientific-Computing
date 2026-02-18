@@ -241,14 +241,12 @@ class LinearTriangularElement():
         Sn = (invJ[1,0]**2)*self.__A +(invJ[1,0]*invJ[1,1])*self.__BpC + (invJ[1,1]**2)*self.__D
         K_global[np.ix_(con,con)] += detJ*(Se + Sn)
 
-    def Ne(self, N, detJ, Ce):
+    def Ne(self, N, con, detJ, Ce):
         for (xi,eta), wi in zip(*triangle_quadrature(self.r_Ne)):
             phi = self.basis_functions(xi,eta)
             ch = np.dot(Ce, phi)
             ch3 = (ch)**3
-            for i in range(self.n):
-                N[i] += (ch3 - ch)*phi[i]*detJ*wi
-    
+            N[con] += (ch3 - ch)*phi*detJ*wi
     
     
     ################################################################
@@ -260,16 +258,13 @@ class LinearTriangularElement():
             phi = self.basis_functions(xi, eta)
             ch = np.dot(Ce, phi)
             ch3 = (ch)**3
-            for i in range(self.n):
-                b_global[con[i]] += (ch3 - 3*ch)*phi[i]*(detJ)*wi
-
+            b_global[con] += (ch3 - 3*ch)*phi*(detJ)*wi
 
     def _c3(self, b_global, con, detJ, Ce):
         for (xi, eta), wi in zip(*triangle_quadrature(self.r_Ne)):
             phi = self.basis_functions(xi, eta)
             ch3 = np.dot(Ce, phi)**3
-            for i in range(self.n):
-                b_global[con[i]] += ch3*phi[i]*(detJ)*wi
+            b_global[con] += ch3*phi*(detJ)*wi
 
 
     def compute_energy(self, detJ, invJ, Ce, eps):
@@ -296,13 +291,13 @@ class LinearTriangularElement():
 
     @staticmethod
     def basis_functions(xi, eta):
-        return [1 - xi - eta, xi, eta]
+        return np.array([1 - xi - eta, xi, eta], dtype =float)
     
     @staticmethod
     def grad_basis_function(xi, eta):
-        return [[-1, -1],
-                [1, 0],
-                [0, 1]]
+        return np.array([[-1, -1],
+                         [1, 0],
+                         [0, 1]], dtype=float)
     
     @staticmethod
     def compute_mass_e(area, Ce):

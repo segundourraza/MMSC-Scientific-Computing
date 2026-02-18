@@ -94,6 +94,8 @@ class CahnHilliardSolver2D:
                 _time_stepper = self._semi_implicit_B
             case 5:
                 _time_stepper = self._1SSI_scheme
+            case 6:
+                _time_stepper = self._2SSI_scheme
             case _:
                 raise ValueError
             
@@ -125,8 +127,9 @@ class CahnHilliardSolver2D:
         ################################################
         # TIME STEPPING
         # return
+        print()
         self.__termination_flag = _time_stepper()
-        tqdm.write("Simulation ended.")
+        tqdm.write("Simulation ended.\n")
         
     
     
@@ -171,7 +174,7 @@ class CahnHilliardSolver2D:
 
     
     ########################################################################
-    # 1st-order Stabilized Semi-Implicit Scheme (1SSI)
+    # 1ST-ORDER STABILIZED SEMI-IMPLICIT SCHEME (1SSI)
 
     def _1SSI_scheme(self):
         """
@@ -209,6 +212,69 @@ class CahnHilliardSolver2D:
         b[:self.__N] *= 1/self.epsilon
 
 
+    ########################################################################
+    # 2ND ORDER STABILIZED SEMI-IMPLICIT SCHEME (2SSI)
+
+    def _2SSI_scheme(self):
+        """
+        2nd-order Stabilized Semi-Implicit Scheme (2SSI)
+        
+        Ref: NUMERICAL APPROXIMATIONS OF ALLEN-CAHN AND CAHN-HILLIARD EQUATIONS - Jie Shen
+        """
+    
+        # USE A TIME STEP OF 1SSI
+        # Since the scheme is second order, we require two previous computations to propagate solution
+        # Compute LHS: This is done once for stencil B
+        A11 = -self.epsilon*self.K - STABILIZATION_CONSTANT/self.epsilon*self.M
+        A = bmat([[A11 ,    self.M],
+                  [self.M,  self.__dt*self.K]], format='csc')
+        b = np.zeros((self.__N*2,))
+        
+        # Pre-compute LU factorisation
+        lu = linalg.splu(A)
+        # Update RHS
+        self.__update_rhs_1SSI(b, self.__u[0,:self.__N], STABILIZATION_CONSTANT)
+        # Solve
+        self.__u[1] = lu.solve(b)
+        # Run checks
+        flag = self.__checks(1)
+
+
+        # START USING 2SSI  
+        A11 = -self.epsilon*self.K - STABILIZATION_CONSTANT/self.epsilon*self.M
+        A = bmat([[A11 ,    self.M],
+                  [self.M,  2/3*self.__dt*self.K]], format='csc')
+        lu = linalg.splu(A)
+        
+        for it in _progress_range(range(2,self.__nt), desc = "Simulation running"):
+            # Update RHS
+            self.__update_rhs_2SSI(b, self.__u[it-2,:self.__N], self.__u[it-1,:self.__N], STABILIZATION_CONSTANT)
+            
+            # SOLVE
+            self.__u[it] = lu.solve(b)
+
+            flag = self.__checks(it)
+
+            if flag != 0:
+                return self.__u[:it-1,:]
+        
+    def __update_rhs_2SSI(self, b, evaluation_C1, evaluation_C2, S):
+        """Assemble non-linear vector for 1st order stabilized semi-implicit scheme"""
+        Mc1 = (self.M@evaluation_C1)
+        Mc2 = (self.M@evaluation_C2)
+        
+        phi1 = np.zeros((self.__N,))
+        phi2 = np.zeros((self.__N,))
+        phi1[:] = -Mc1
+        phi2[:] = -Mc2
+        for e,con in enumerate(self.__connectivity):
+            self.element._c3(phi1, con,self.__detJ[e], evaluation_C1[con])
+            self.element._c3(phi2, con,self.__detJ[e], evaluation_C2[con])
+        b[:self.__N] = -2*S*Mc2 + S*Mc1 + 2*(phi2) - phi1
+        b[:self.__N] *= 1/self.epsilon
+        b[self.__N:] = 4/3*Mc2 - 1/3*Mc1
+
+
     ####################################################################
     # ASSEMBLE GLOBAL LINEAR SYSTEMS
     def __assemble_M(self)->csc_matrix:
@@ -231,7 +297,7 @@ class CahnHilliardSolver2D:
         N = np.zeros((self.__N,), dtype=float)
         for e,con in enumerate(self.__connectivity):
             # Classic overlapping block assembly
-            self.element.Ne(N[con], self.__detJ[e], evaluation_C[con])
+            self.element.Ne(N, con, self.__detJ[e], evaluation_C[con])
         return N
     
     #####################################################################
@@ -259,6 +325,30 @@ class CahnHilliardSolver2D:
         
         return cls(epsilon=epsilon, nodes=nodes, connectivity=connectivity)
     
+    @classmethod
+    def generate_circular_mesh(cls, epsilon, r=1.0, mesh_size=0.1):
+        """
+        Generate a 2D triangular mesh of a disk of radius r.
+        
+        Returns:
+            points : (N,2) array
+            triangles : (M,3) connectivity
+        """
+        with pygmsh.geo.Geometry() as geom:
+            geom.add_circle([0.0, 0.0, 0.0], r, mesh_size=mesh_size)
+            mesh = geom.generate_mesh()
+
+        nodes = mesh.points[1:, :2]
+
+        # Extract triangle cells
+        connectivity = None
+        for cell_block in mesh.cells:
+            if cell_block.type == "triangle":
+                connectivity = cell_block.data
+                break
+        connectivity -= 1
+
+        return cls(epsilon=epsilon, nodes=nodes, connectivity=connectivity)
 
     #####################################################################
     # AUXILIARY FUNCTIONS
@@ -276,14 +366,14 @@ class CahnHilliardSolver2D:
             
         vmin = kwargs.get('vmin', min(np.nanmin(z), -1.0))
         vmax = kwargs.get('vmax', max(np.nanmax(z), 1.0))
-        print(vmin, vmax)
+
         levels = np.linspace(vmin, vmax, levels)
         tcf = ax.tricontourf(self.__tri, z, levels, cmap = cmap)
         if plot_mesh:
             self.plot_mesh(ax=ax, **kwargs)
         return tcf, levels
 
-    def animate_solution(self, vector = 'c', fps = 10, cmap = 'jet', levels = 100, filename = None, directory = None):
+    def animate_solution(self, vector = 'c', fps = 10, cmap = 'jet', levels = 100, prepend = None, directory = None):
 
         if vector == 'c':
             v = self.sol_c
@@ -292,8 +382,10 @@ class CahnHilliardSolver2D:
         else:
             RuntimeError()
         
-        if filename is None:
-            filename = self.simulation_name + "_gif_" + vector 
+        if prepend is None:
+            filename = self.simulation_name + "_gif_" + vector
+        else:
+            filename = prepend + "_" + self.simulation_name + "_gif_" + vector 
 
         # Ensure extension
         if not filename.endswith(".gif"):
@@ -340,9 +432,11 @@ class CahnHilliardSolver2D:
         plt.close(fig)
         
     
-    def save(self, filename = None, directory = None, append_time = False):
-        if filename is None:
+    def save(self, prepend = None, directory = None, append_time = False):
+        if prepend is None:
             filename = self.simulation_name
+        else:
+            filename = prepend + "_" + self.simulation_name
 
         if append_time:
             filename += "_" + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
@@ -390,7 +484,7 @@ class CahnHilliardSolver2D:
             # -----------------
             sol_grp.attrs["saved_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
         
-        print("\nSimulation successfully saved as : {}".format(filepath))
+        print("Simulation successfully saved as : {}\n".format(filepath))
 
     #####################################################################
     # HELPER FUNCTIONS
@@ -494,6 +588,16 @@ class CahnHilliardSolver2D:
     def tri(self):
         """Triangulations object"""
         return self.__tri
+
+    @property
+    def nodes(self):
+        """Nodes"""
+        return self.__nodes
+        
+    @property
+    def connectivity(self):
+        """connectivity"""
+        return self.__connectivity
     
     @property
     def simulation_name(self):

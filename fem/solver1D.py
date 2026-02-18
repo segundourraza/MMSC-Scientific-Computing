@@ -44,7 +44,7 @@ class CahnHilliardSolver1D():
         
         self.epsilon:float = epsilon
         self.element:_LegendreElement = ELEMENT_MAP[polynomial_order]
-        self.__ne: int = number_of_elements
+        self.__Ne: int = number_of_elements
         self.__N:int = number_of_elements*self.element.degree+1
 
 
@@ -149,7 +149,7 @@ class CahnHilliardSolver1D():
         """Assemble Mass Matrix"""
         M = np.zeros((self.__N, self.__N), dtype= float)
         # Loop over elements
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             # Classic overlapping block assembly
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
@@ -159,7 +159,7 @@ class CahnHilliardSolver1D():
     def __assemble_K(self)->csc_matrix:
         """Assemble Stiffness Matrix"""
         K = np.zeros((self.__N, self.__N), dtype= float)
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             # Classic overlapping block assembly
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
@@ -169,7 +169,7 @@ class CahnHilliardSolver1D():
     def __assemble_N(self, evaluation_C):
         """Assemble non-linear mass matrix"""
         N = np.zeros((self.__N,), dtype=float)
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             # Classic overlapping block assembly
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
@@ -179,7 +179,7 @@ class CahnHilliardSolver1D():
     def __assemble_H(self, evaluation_C)->csc_matrix:
         """Assemble Nonlinear Jacobian Block"""
         H = np.zeros((self.__N, self.__N), dtype= float)
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             # Classic overlapping block assembly
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
@@ -275,7 +275,7 @@ class CahnHilliardSolver1D():
 
     def _compute_phi1_A(self, evaluation_C):
         b = np.zeros((self.__N,))
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
             self.element._c3(b[i:i+self.element.n], he, evaluation_C[i:i+self.element.n])    
@@ -283,7 +283,7 @@ class CahnHilliardSolver1D():
 
     def _compute_phi2_A(self, evaluation_C):
         b = np.zeros((self.__N,))
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
             self.element._c1(b[i:i+self.element.n], he, evaluation_C[i:i+self.element.n])    
@@ -320,7 +320,7 @@ class CahnHilliardSolver1D():
         """Assemble non-linear vector for semi implicit B"""
         b[:self.__N] = 1/self.__dt*(self.M@evaluation_C)
         b[self.__N:] = 0
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
             self.element.b2_b(b[self.__N+i:self.__N+i+self.element.n], he, evaluation_C[i:i+self.element.n])    
@@ -360,7 +360,7 @@ class CahnHilliardSolver1D():
         temp = (self.M@evaluation_C)
         b[self.__N:] = temp
         b[:self.__N] = -temp
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
             self.element._c3(b[i:i+self.element.n], he, evaluation_C[i:i+self.element.n])
@@ -403,7 +403,7 @@ class CahnHilliardSolver1D():
         temp = (self.M@evaluation_C)
         b[self.__N:] = temp
         b[:self.__N] = -temp - S*temp
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
             self.element._c3(b[i:i+self.element.n], he, evaluation_C[i:i+self.element.n])
@@ -467,7 +467,7 @@ class CahnHilliardSolver1D():
         phi2 = np.zeros((self.__N,))
         phi1[:] = -Mc1
         phi2[:] = -Mc2
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]    
             self.element._c3(phi1[i:i+self.element.n], he, evaluation_C1[i:i+self.element.n])
@@ -578,7 +578,7 @@ class CahnHilliardSolver1D():
     # AUXILIARY FUNCTIONS
     def __compute_mass(self, u):
         M = 0
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
             M += self.element.compute_mass_e(he, u[i:i+self.element.n])
@@ -586,7 +586,7 @@ class CahnHilliardSolver1D():
     
     def __compute_J(self, u):
         J = 0    
-        for e in range(self.__ne):
+        for e in range(self.__Ne):
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]
             J += self.element.compute_J_e(self.epsilon, he, u[i:i+self.element.n])
@@ -603,9 +603,9 @@ class CahnHilliardSolver1D():
 
     def interpolate_elements(self,u, nodes_per_elements:int):
 
-        x_interp = np.ones((self.__ne*(nodes_per_elements-1)+1,))*99
-        c_interp = np.zeros((self.__ne*(nodes_per_elements-1)+1,))
-        w_interp = np.zeros((self.__ne*(nodes_per_elements-1)+1,))
+        x_interp = np.ones((self.__Ne*(nodes_per_elements-1)+1,))*99
+        c_interp = np.zeros((self.__Ne*(nodes_per_elements-1)+1,))
+        w_interp = np.zeros((self.__Ne*(nodes_per_elements-1)+1,))
 
 
         for e in range(self.Ne):
@@ -661,7 +661,7 @@ class CahnHilliardSolver1D():
             # Save scalars
             # -----------------
             scal_grp = sol_grp.create_group("scalars")
-            for name, value in zip(['Ne', 'N', 'dt', 'T'], [self.__ne, self.__N, self.__dt, self.__T]):
+            for name, value in zip(['Ne', 'N', 'dt', 'T'], [self.__Ne, self.__N, self.__dt, self.__T]):
                 scal_grp.create_dataset(name, data=value)
 
             # -----------------
@@ -686,7 +686,7 @@ class CahnHilliardSolver1D():
     @property
     def Ne(self):
         """Number of elements"""
-        return self.__ne
+        return self.__Ne
         
     @property
     def t(self):

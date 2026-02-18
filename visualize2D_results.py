@@ -38,9 +38,22 @@ def analyzer_contours(file_name, nt, plot_mesh = False, levels = 100, cmap = 'je
     arrays, scalars = load_solution_hdf5(fp / file_name)
     
     fig, ax = plt.subplots(1,2)
-    ax[0].plot(arrays['t'], abs(arrays['mass'] - arrays['mass'][0]))
+    ax[0].semilogy(arrays['t'], abs(arrays['mass'] - arrays['mass'][0]))
     ax[1].plot(arrays['t'], arrays['energy'])
-    ax[0].set_yscale('log')
+    
+        
+    ax[1].legend(fontsize = 12)
+    ax[0].set_title("Error in Mass")
+    ax[0].set_ylabel('$|\\mathcal{M}(c^n) - \\mathcal{M}(c^0)|$')
+    ax[1].set_title("Ginzburg-Landau Energy")
+    ax[1].set_ylabel('$\\mathcal{E}(c)$')
+    
+    [_.grid(which='major', linestyle='-', linewidth=0.8) for _ in ax]
+    ax[0].grid(which='minor', linestyle='-', linewidth=0.25)
+
+    [_.ticklabel_format(style='scientific', axis='x', scilimits=(0, 0)) for _ in ax]
+    [_.set_xlabel('t') for _ in ax]
+    fig.tight_layout()
 
     tri = Triangulation(arrays['nodes'][:,0], arrays['nodes'][:,1], arrays['connectivity'])
         
@@ -67,6 +80,12 @@ def analyzer_contours(file_name, nt, plot_mesh = False, levels = 100, cmap = 'je
     ax2[0].ticklabel_format(style='scientific', axis='y', scilimits=(0, 0))
     ax2[0].set_ylabel("y", rotation = 0, labelpad = 10)
 
+    # for ax in ax2:
+    #     # ax.spines['bottom'].set_zorder(0)
+    #     [ax.spines[_].set_visible(False) for _ in ['right', 'top']]
+    # # ax2[1].set_yticks([])
+    # [ax2[1].spines[_].set_visible(False) for _ in ['left']]
+
     # Horizontal colorbar at bottom
     cbar = fig2.colorbar(
         cf,
@@ -79,26 +98,26 @@ def analyzer_contours(file_name, nt, plot_mesh = False, levels = 100, cmap = 'je
     # fig2.tight_layout()
     
     
-    #####################################################
-    # CONTOUR PLOT W
-    fig3, ax3 = plt.subplots(1,2, sharey=True)
-    fig3.subplots_adjust(wspace=0.05)
-    fig3.suptitle("w(x,y)")
-    cf = ax3[0].tricontourf(tri, arrays['sol_w'][0], levels = levels, cmap = cmap)
-    fig3.colorbar(cf, ax=ax3[0], location='left')
-    cf = ax3[1].tricontourf(tri, arrays['sol_w'][nt], levels = levels, cmap = cmap)
-    fig3.colorbar(cf, ax=ax3[1], location='right')
-    if plot_mesh:
-        ax3[0].triplot(tri, linewidth = 0.5, color = 'k')
-        ax3[1].triplot(tri, linewidth = 0.5, color = 'k')
+    # #####################################################
+    # # CONTOUR PLOT W
+    # fig3, ax3 = plt.subplots(1,2, sharey=True)
+    # fig3.subplots_adjust(wspace=0.05)
+    # fig3.suptitle("w(x,y)")
+    # cf = ax3[0].tricontourf(tri, arrays['sol_w'][0], levels = levels, cmap = cmap)
+    # fig3.colorbar(cf, ax=ax3[0], location='left')
+    # cf = ax3[1].tricontourf(tri, arrays['sol_w'][nt], levels = levels, cmap = cmap)
+    # fig3.colorbar(cf, ax=ax3[1], location='right')
+    # if plot_mesh:
+    #     ax3[0].triplot(tri, linewidth = 0.5, color = 'k')
+    #     ax3[1].triplot(tri, linewidth = 0.5, color = 'k')
 
-    ax3[0].set_title(f"Starting Solution", fontsize = 10)
-    ax3[1].set_title(f"Time = {arrays['t'][nt]:.2e}", fontsize = 10)
-    for ax in ax3:
-        ax.set_xlim(right = 0.99*ax.get_xlim()[1])
-        ax.set_xlabel("x")
-    ax3[0].ticklabel_format(style='scientific', axis='y', scilimits=(0, 0))
-    ax3[0].set_ylabel("y", rotation = 0, labelpad = 10)
+    # ax3[0].set_title(f"Starting Solution", fontsize = 10)
+    # ax3[1].set_title(f"Time = {arrays['t'][nt]:.2e}", fontsize = 10)
+    # for ax in ax3:
+    #     ax.set_xlim(right = 0.99*ax.get_xlim()[1])
+    #     ax.set_xlabel("x")
+    # ax3[0].ticklabel_format(style='scientific', axis='y', scilimits=(0, 0))
+    # ax3[0].set_ylabel("y", rotation = 0, labelpad = 10)
 
 
 def analyzer_time_complexity(prefix, dts, fp = Path.cwd() / "solution"):
@@ -192,11 +211,14 @@ def analyzer_space_complexity(prefix, dt,fp = Path.cwd() / "solution"):
     fig3.tight_layout()
 
 
-
 if __name__ == '__main__':
     
     filename = "Cahn_Hilliard2D_solution_1ssi_Ne5824_T5.0e-03_dt1.0e-05.h5"
-    analyzer_contours(filename, nt = -1, plot_mesh=True)
+
+
+    filename = 'circular_Cahn_Hilliard2D_solution_1ssi'
+    filename = "circular_Cahn_Hilliard2D_solution_1ssi_Ne18373_T1.0e-03_dt1.0e-05.h5"
+    analyzer_contours(filename, nt = -1, plot_mesh=False)
     
 
 

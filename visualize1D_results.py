@@ -103,7 +103,7 @@ def result_analyzer(prefix, period, fp = Path.cwd() / 'solution'):
         raise RuntimeError(f"No file found with pattern: '{pattern}'")
 
     grouped_files, ne_ch, dt_ch = group_by_ne_and_dt(file_list)
-    print(dt_ch, ne_ch)
+
     ##########################################
     # TEMPORAL COMPLEXITY ANALYSIS
     complexity_data = []
