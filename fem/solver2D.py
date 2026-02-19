@@ -404,15 +404,16 @@ class CahnHilliardSolver2D:
         fig, ax = plt.subplots(figsize=(6, 4))
         ax.set_title("tricontourf GIF example")
 
-        tcf = ax.tricontourf(self.__tri, v[0], levels, cmap = cmap)
+        vmin = np.nanmin(v)
+        vmax = np.nanmax(v)
+        tcf = ax.tricontourf(self.__tri, v[0], levels, cmap = cmap, vmin= vmin, vmax = vmax)
         ax.set_title(f"Tme step: 0")
         cbar = fig.colorbar(tcf, ax=ax)
         
         def update(i):
             ax.clear()
-            tcf = ax.tricontourf(self.__tri, v[i], levels=levels, cmap = cmap)
-            cbar.update_normal(tcf)
-
+            tcf = ax.tricontourf(self.__tri, v[i], levels=levels, cmap = cmap, vmin= vmin, vmax = vmax)
+            # cbar.update_normal(tcf)
             ax.set_title(f"Time step: {i}")
             return tcf
         

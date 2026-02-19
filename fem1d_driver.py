@@ -19,9 +19,9 @@ if __name__ == '__main__':
     dt = 1e-6
     time_integrator = 1
     
-    # Semi implicit CASE A
-    dt = 1e-4
-    time_integrator = 2
+    # # Semi implicit CASE A
+    # dt = 1e-4
+    # time_integrator = 2
 
 
     # Semi implicit CASE B
@@ -29,9 +29,9 @@ if __name__ == '__main__':
     time_integrator = 3
 
 
-    # 1ST ORDER SEMI IMPLICIT SCHEME
-    dt = 1e-6
-    time_integrator = '1si'
+    # # 1ST ORDER SEMI IMPLICIT SCHEME
+    # dt = 1e-6
+    # time_integrator = '1si'
 
     # # 1ST ORDER STABILIZED SEMI IMPLICIT SCHEME
     # dt = 1e-5

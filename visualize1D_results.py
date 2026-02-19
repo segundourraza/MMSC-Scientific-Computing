@@ -114,7 +114,6 @@ def result_analyzer(prefix, period, fp = Path.cwd() / 'solution'):
 
         # COMPLEXITY DATA
         if arrays['t'][-1] == scalars['T']:
-            print(name)
             complexity_data.append([scalars['T']/scalars['dt'], arrays['sol_c'][-1,:]])
     
     if len(complexity_data) < 2:
@@ -345,47 +344,12 @@ def result_visualizer(prefix, period, levels = 100, cmap = 'jet', fp = Path.cwd(
 
 if __name__ == '__main__':
     
-    # # SCHEME B
-    # prefix = "Cahn_Hilliard_solution_b_CG1_Ne100_T1.0e-03"
-    # dts = [1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7]
-    
-    # # 1SI
-    # prefix = "Cahn_Hilliard_solution_1si_CG1_Ne100_T1.0e-03"
-    # dts = [1e-5, 1e-6, 5e-7, 1e-7, 5e-8]
-    # # dts = [1e-5]
-    # # dts = [1e-6, 5e-7, 1e-7, 5e-8]
-    
-    
-    # # 1SSI
-    # prefix = "Cahn_Hilliard_solution_1ssi_CG1_Ne100_T1.0e-03"
-    # dts = [1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7]
-    # analyzer_contours_with_dt(prefix, dts)
-    # analyzer_time_complexity(prefix, dts)
-    
-    # 2SSI
-    # prefix = "Cahn_Hilliard_solution_2ssi_CG2_Ne100_T1.0e-03"
-    # prefix = "Cahn_Hilliard_solution_2ssi_CG1_Ne100_T1.0e-03"
-    # dts = [1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7]
-    # analyzer_contours_with_dt(prefix, dts)
-    # analyzer_time_complexity(prefix, dts)
-    
-    # prefix = "Cahn_Hilliard_solution_1ssi_CG1"
-    # dt = 1e-5
-    # analyzer_contours_with_Ne(prefix, dt)
-    # # analyzer_space_complexity(prefix, dt)
-    
-    
-    # prefix = "Cahn_Hilliard_solution_1ssi_CG2"
-    # dt = 1e-5
-    # analyzer_contours_with_Ne(prefix, dt)
-    # analyzer_space_complexity(prefix, dt)
-    
     
     prefix = "Cahn_Hilliard_solution_b_CG1"
-    prefix = "Cahn_Hilliard_solution_1si_CG1"
+    # prefix = "Cahn_Hilliard_solution_1si_CG1"
     # prefix = "Cahn_Hilliard_solution_1ssi_CG1"
     # prefix = "Cahn_Hilliard_solution_1ssi_CG2"
-    # prefix = "Cahn_Hilliard_solution_2ssi_CG1"
+    prefix = "Cahn_Hilliard_solution_2ssi_CG1"
     # prefix = "Cahn_Hilliard_solution_2ssi_CG2"
     period = 1e-3
     result_analyzer(prefix, period)

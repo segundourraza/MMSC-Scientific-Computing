@@ -216,8 +216,8 @@ if __name__ == '__main__':
     filename = "Cahn_Hilliard2D_solution_1ssi_Ne5824_T5.0e-03_dt1.0e-05.h5"
 
 
-    filename = 'circular_Cahn_Hilliard2D_solution_1ssi'
-    filename = "circular_Cahn_Hilliard2D_solution_1ssi_Ne18373_T1.0e-03_dt1.0e-05.h5"
+    # filename = 'circular_Cahn_Hilliard2D_solution_1ssi'
+    # filename = "circular_Cahn_Hilliard2D_solution_1ssi_Ne18373_T1.0e-03_dt1.0e-05.h5"
     analyzer_contours(filename, nt = -1, plot_mesh=False)
     
 
