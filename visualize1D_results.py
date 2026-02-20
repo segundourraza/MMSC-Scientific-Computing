@@ -113,7 +113,8 @@ def result_analyzer(prefix, period, fp = Path.cwd() / 'solution'):
         arrays, scalars = load_solution_hdf5(fp / name)
 
         # COMPLEXITY DATA
-        if arrays['t'][-1] == scalars['T']:
+        print(name, arrays['t'][-1] , scalars['T'], np.isclose(arrays['t'][-1] , scalars['T']))
+        if np.isclose(arrays['t'][-1] , scalars['T']):
             complexity_data.append([scalars['T']/scalars['dt'], arrays['sol_c'][-1,:]])
     
     if len(complexity_data) < 2:
@@ -141,8 +142,6 @@ def result_analyzer(prefix, period, fp = Path.cwd() / 'solution'):
         fig3.tight_layout()
 
 
-    ##########################################
-    # COMPLEXITY PLOT
 
     ##########################################
     # SPATIAL COMPLEXITY ANALYSIS
@@ -342,18 +341,139 @@ def result_visualizer(prefix, period, levels = 100, cmap = 'jet', fp = Path.cwd(
 
 
 
+def group_by_scheme(files):
+    """
+    files: iterable of Path or strings (file names or pathlib.Path)
+    returns: (ne_groups, dt_groups) where each is a dict: key -> list[Path]
+    """
+    # patterns: capture anything after Ne (or dt) until an underscore or end-of-string
+    re_scheme = re.compile(r'solution_([^_]+)')  # capture all schemes
+    
+    groups = defaultdict(list)
+    
+    for p in files:
+        p = Path(p)
+        name = p.name
+
+        m_scheme = re_scheme.search(name)
+        if not m_scheme:
+            # skip files without Ne (change behavior if you want them included)
+            continue
+
+        # parse ne_key (try int conversion, otherwise leave as string)
+        scheme_key = m_scheme.group(1)
+        groups[scheme_key].append(p)
+
+    return groups
+
+
+def compare_complexities(prefix,  fp = Path.cwd() / "solution"):
+    
+    fig1, ax1 = plt.subplots(1,2)
+    fig2, ax2 = plt.subplots(1,2)
+    for e, element_type in enumerate(['CG1', 'CG2']):
+        
+        [a[e].set_title("Element type: {}".format(element_type)) for a in [ax1,ax2]]
+        pattern = prefix + "*{}*".format(element_type)
+        file_list = []
+        for f in list(fp.rglob(pattern)):
+            file_list.append(f)
+        schemes = group_by_scheme(file_list)
+        for scheme,files in schemes.items():
+            print(f"{scheme: ^4}", len(scheme))
+            grouped_files, ne_ch, dt_ch = group_by_ne_and_dt(files)
+            data = []
+            
+            ###############################################################################
+            # TIME COMPLXITY
+            for i,name in enumerate(v for k,v in grouped_files.items() if k[0] in ne_ch):
+                arrays, scalars = load_solution_hdf5(fp / name)
+                if np.isclose(arrays['t'][-1] , scalars['T']):
+
+
+                    data.append([scalars['T']/scalars['dt'], arrays['sol_c'][-1,:]])
+            if len(data) < 2:
+                print('\nNot enough data to do a temporal complexity analysis')
+            else:
+                nt, data = zip(*sorted(data))
+                nt = nt[:-1]
+                error = [np.linalg.norm(_ - data[-1]) for _ in data[:-1]]
+
+                # PLOTS
+                l, = ax1[e].loglog(nt, error, '-s')
+                m,c = np.polyfit(np.log(nt), np.log(error), 1)
+                def f(x): return x**(m)*np.exp(c)
+                ax1[e].plot(nt, f(nt), '--', color = l.get_color(), label = f"{scheme: ^4}" +  r": $\log(e) = {:.2f}\log(nt) + {:.2f}$".format(m,c))
+                
+            
+            
+            
+            
+            ##########################################
+            # SPATIAL COMPLEXITY ANALYSIS
+            data = []
+            for i,name in enumerate(v for k,v in grouped_files.items() if k[1] in dt_ch):
+                arrays, scalars = load_solution_hdf5(fp / name)
+                # COMPLEXITY DATA
+                if arrays['t'][-1] == scalars['T']:
+                    data.append([scalars['Ne'], arrays['sol_c'][-1][-1]])
+            if len(data) < 2:
+                print('\nNot enough data to do a spatial complexity analysis')
+            else:
+                # # COMPLEXITY PLOT
+                ne, data = zip(*sorted(data))
+                ne = np.array(ne[:-1])
+                error = np.array([abs(_ - data[-1]) for _ in data[:-1]])
+
+                ne_crit = 1/(2*np.sqrt(2)/9 *np.arctanh(0.95)*0.01)
+                # id2 = sorted([i for i, v in enumerate(ne) if v < ne_crit], key=lambda i: ne[i])
+                id2 = range(len(ne))
+                
+                l, = ax2[e].loglog(ne, error, '-s')
+                m,c = np.polyfit(np.log(ne[id2]), np.log(error[id2]), 1)
+                def f(x): return x**(m)*np.exp(c)
+                ax2[e].plot(ne[id2], f(ne[id2]), '--', color = l.get_color(), label = f"{scheme:>4} :" + r"$\log(e) = {:.2f}\log(Ne) + {:.2f}$".format(m,c))
+                # ax2.axvline(ne_crit, color = 'k', label = r"$N_{e,crit} = \frac{9}{2\sqrt{2}\tanh^{-1}(0.95)}$")
+
+        for f,a in zip([fig1,fig2],[ax1[e], ax2[e]]):
+            a.grid(which='major', linestyle='-', linewidth=0.8)
+            a.grid(which='minor', linestyle='-', linewidth=0.25)
+            a.legend()
+            # f.tight_layout()
+
+        ax1[e].set_xlabel("Time steps")
+        ax1[e].set_ylabel(r"$||c(x, T; dt) - c(x, T; 1\times10^{-7})||_2$")
+        ax2[e].set_xlabel("Number of Elements")
+        ax2[e].set_ylabel(r"$||c(x, T; dt) - c(x, T; 1\times10^{-7})||_2$")
+    fig1.suptitle("Temporal Computational Complexity")
+    fig2.suptitle("Spatial Computational Complexity")
+
+
+
+
 if __name__ == '__main__':
     
     
-    prefix = "Cahn_Hilliard_solution_b_CG1"
+    # prefix = "Cahn_Hilliard_solution_b_CG1"
     # prefix = "Cahn_Hilliard_solution_1si_CG1"
-    # prefix = "Cahn_Hilliard_solution_1ssi_CG1"
-    # prefix = "Cahn_Hilliard_solution_1ssi_CG2"
-    prefix = "Cahn_Hilliard_solution_2ssi_CG1"
-    # prefix = "Cahn_Hilliard_solution_2ssi_CG2"
-    period = 1e-3
-    result_analyzer(prefix, period)
-    result_visualizer(prefix, period)
+    # # prefix = "Cahn_Hilliard_solution_1ssi_CG1"
+    # # prefix = "Cahn_Hilliard_solution_1ssi_CG2"
+    # # prefix = "Cahn_Hilliard_solution_2ssi_CG1"
+    # # prefix = "Cahn_Hilliard_solution_2ssi_CG2"
+    # period = 1e-3
+    # period = 1e-4
+    # result_analyzer(prefix, period)
+    # result_visualizer(prefix, period)
+
+
+
+    ######################################
+    # Comparing Complexity of all Methods
+    
+    prefix = "Cahn_Hilliard_solution"
+    compare_complexities(prefix)
+
+
 
     plt.show()
     
