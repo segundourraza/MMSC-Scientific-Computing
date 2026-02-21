@@ -208,6 +208,10 @@ class _LegendreElement2D(ABC):
 
     n = None
     degree = None
+
+    r_Ne = None
+    r_mass = None
+
     _A = None
     _BpC = None
     _D = None
@@ -233,6 +237,9 @@ class _LegendreElement2D(ABC):
         if cls._M is None:
             raise TypeError("Subclasses must define '__M'")
     
+        if cls.r_Ne is None:
+            raise TypeError("Subclasses must define 'r_Ne'")
+    
     @staticmethod
     @abstractmethod
     def basis_functions(xi, eta): ...
@@ -244,6 +251,10 @@ class _LegendreElement2D(ABC):
     @staticmethod
     @abstractmethod
     def quadrature_points(n_points): ...
+    
+    @abstractmethod
+    def compute_ele_properties(self,nodes):...
+
 
     def Me(self, M_global, con, detJ):
         M_global[np.ix_(con,con)] += detJ*self._M
@@ -259,19 +270,59 @@ class _LegendreElement2D(ABC):
             ch = np.dot(Ce, phi)
             ch3 = (ch)**3
             N[con] += (ch3 - ch)*phi*detJ*wi
+    ################################################################
+    # TIME STEPPING SPECIFIC MATRICES
+
+    def b2_b(self, b_global, con, detJ, Ce):
+        for (xi, eta), wi in zip(*self.quadrature_points(self.r_Ne)):
+            phi = self.basis_functions(xi, eta)
+            ch = np.dot(Ce, phi)
+            ch3 = (ch)**3
+            b_global[con] += (ch3 - 3*ch)*phi*(detJ)*wi
+
+    def _c3(self, b_global, con, detJ, Ce):
+        for (xi, eta), wi in zip(*self.quadrature_points(self.r_Ne)):
+            phi = self.basis_functions(xi, eta)
+            ch3 = np.dot(Ce, phi)**3
+            b_global[con] += ch3*phi*(detJ)*wi
+
+    def compute_energy(self, detJ, invJ, Ce, eps):
+        E = 0
+        for (xi, eta), wi in zip(*self.quadrature_points(self.r_Ne)):
+            phi = self.basis_functions(xi, eta)
+            ch2 = np.dot(Ce, phi)**2
+
+            grad_phi = self.grad_basis_function(xi, eta)
+        
+            grad_c = ((invJ@grad_phi.T)@Ce)
+            grad_c2 = np.dot(grad_c, grad_c)
+            
+            E += (1/(4*eps)*(1- ch2**2)**2 + eps/2*grad_c2)*(detJ)*wi
+        return E
     
+    def compute_mass(self, detJ, Ce):
+        dM = 0
+        for (xi, eta), wi in zip(*self.quadrature_points(self.r_mass)):
+            phi = self.basis_functions(xi, eta)
+            ch = np.dot(Ce, phi)
+            dM += ch*(detJ)*wi
+        return dM
 class LinearTriangularElement(_LegendreElement2D):
-
-
+    
     n = 3 # Number of nodes in element
     degree = 1
 
     # Quadrature points
     r_Ne:int = 6
-
+    r_mass: int = 1
 
     #############################################
     # BASIC ELEMENT MATRICES
+    
+    _M = (1/24)*np.array([[2, 1, 1],
+                           [1, 2, 1],
+                           [1, 1, 2]], dtype=float)
+    
     _A = 0.5*np.array([[1, -1, 0],
                         [-1, 1, 0],
                         [0, 0, 0]], dtype=float)
@@ -284,53 +335,10 @@ class LinearTriangularElement(_LegendreElement2D):
                         [0, 0, 0],
                         [-1, 0, 1]], dtype=float)
     
-    _M = (1/24)*np.array([[2, 1, 1],
-                           [1, 2, 1],
-                           [1, 1, 2]], dtype=float)
-    
     @staticmethod
     def quadrature_points(n_points):
         return triangle_quadrature(n_points)
     
-    ################################################################
-    # TIME STEPPING SPECIFIC MATRICES
-
-    def b2_b(self, b_global, con, detJ, Ce):
-        for (xi, eta), wi in zip(*triangle_quadrature(self.r_Ne)):
-            phi = self.basis_functions(xi, eta)
-            ch = np.dot(Ce, phi)
-            ch3 = (ch)**3
-            b_global[con] += (ch3 - 3*ch)*phi*(detJ)*wi
-
-    def _c3(self, b_global, con, detJ, Ce):
-        for (xi, eta), wi in zip(*triangle_quadrature(self.r_Ne)):
-            phi = self.basis_functions(xi, eta)
-            ch3 = np.dot(Ce, phi)**3
-            b_global[con] += ch3*phi*(detJ)*wi
-
-    def compute_energy(self, detJ, invJ, Ce, eps):
-        E = 0
-        for (xi, eta), wi in zip(*triangle_quadrature(6)):
-            phi = self.basis_functions(xi, eta)
-            ch2 = np.dot(Ce, phi)**2
-
-            grad_phi = self.grad_basis_function(xi, eta)
-        
-            # dcdx = np.dot(Ce, [[invJ[0,0]*grad_phi[0][0] + invJ[0,1]*grad_phi[0][1]],
-            #                    [invJ[0,0]*grad_phi[1][0] + invJ[0,1]*grad_phi[1][1]],
-            #                    [invJ[0,0]*grad_phi[2][0] + invJ[0,1]*grad_phi[2][1]]])**2
-            # dcdy = np.dot(Ce, [[invJ[1,0]*grad_phi[0][0] + invJ[1,1]*grad_phi[0][1]],
-            #                    [invJ[1,0]*grad_phi[1][0] + invJ[1,1]*grad_phi[1][1]],
-            #                    [invJ[1,0]*grad_phi[2][0] + invJ[1,1]*grad_phi[2][1]]])**2
-            # grad_c2 = dcdx + dcdy
-            
-            # raise ValueErro
-            grad_c = ((invJ@grad_phi.T)@Ce)
-            grad_c2 = np.dot(grad_c, grad_c)
-            
-            E += (1/(4*eps)*(1- ch2**2)**2 + eps/2*grad_c2)*(detJ)*wi
-        return E
-
 
     @staticmethod
     def basis_functions(xi, eta):
@@ -342,16 +350,34 @@ class LinearTriangularElement(_LegendreElement2D):
                          [1, 0],
                          [0, 1]], dtype=float)
     
-    @staticmethod
-    def compute_mass_e(area, Ce):
-        return area*np.sum(Ce)/3
-    
+    def compute_ele_properties(self, nodes):
+        x1, x2, x3 = nodes[:,0]
+        y1, y2, y3 = nodes[:,1]
 
+        dx31 = x3 - x1
+        dx21 = x2 - x1
+        dy21 = y2 - y1
+        dy31 = y3 - y1
+
+        J = np.array([[dx21, dx31],
+                         [dy21, dy31]])
+        detJ = dy31*dx21 - dx31*dy21
+        invJ = 1/detJ*np.array([[dy31, -dx31],
+                                [-dy21, dx21]])
+        return J, detJ, invJ
+    
+    
 class LinearRectElement(_LegendreElement2D):
 
     n:int = 4
     degree:int = 1
     
+    r_Ne:int = -1
+    
+    _M = (1/9)*np.array([[4, 2, 2, 1],
+                          [2, 4, 1, 2],
+                          [2, 1, 4, 2],
+                          [1, 2, 2, 4]], dtype=float)
     
     _A   = 1/6*np.array([[2, -2, 1, -1],
                          [-2, 2, -1, 1],
@@ -368,12 +394,6 @@ class LinearRectElement(_LegendreElement2D):
                           [-2, -1, 2, 1],
                           [-1, -2, 1, 2]], dtype=float)
     
-    _M = (1/9)*np.array([[4, 2, 2, 1],
-                          [2, 4, 1, 2],
-                          [2, 1, 4, 2],
-                          [1, 2, 2, 4]], dtype=float)
-    
-
     
     @staticmethod
     def basis_functions(xi, eta):
@@ -396,10 +416,31 @@ class LinearRectElement(_LegendreElement2D):
         X, Y = np.meshgrid(x, x)
         return np.vstack([X.ravel(), Y.ravel()]).T, np.outer(w,w).ravel()
     
+    def compute_ele_properties(self, nodes):
+        x1, x2, x3, x4 = nodes[:,0]
+        y1, y2, y3, y4 = nodes[:,1]
+
+        dx31 = x3 - x1
+        dx21 = x2 - x1
+        dy21 = y2 - y1
+        dy31 = y3 - y1
+
+        J = np.array([[dx21, dx31],
+                         [dy21, dy31]])
+        detJ = dy31*dx21 - dx31*dy21
+        A = 0.5*detJ
+        invJ = 1/detJ*np.array([[dy31, -dx31],
+                                [-dy21, dx21]])
+        return J, detJ, A, invJ
+
 class QuadraticRectElement(_LegendreElement2D):
 
     n:int = 9
     degree:int = 1
+    
+    
+    
+    r_Ne:int = -1
     
     
     _A = 1/90 * np.array([[28, 4, -1, -7, -32, 2, 8, 14, -16],

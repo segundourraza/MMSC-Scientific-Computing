@@ -61,24 +61,10 @@ class CahnHilliardSolver2D:
 
         # Compute Jacobian
         self.__J = [0]*self.__Ne
-        self.__A = np.zeros((self.__Ne,))
         self.__detJ = np.zeros((self.__Ne,))
         self.__InvJ = [0]*self.__Ne
         for e,con in enumerate(self.__connectivity):
-            x1, x2, x3 = self.__nodes[con,0]
-            y1, y2, y3 = self.__nodes[con,1]
-
-            dx31 = x3 - x1
-            dx21 = x2 - x1
-            dy21 = y2 - y1
-            dy31 = y3 - y1
-
-            self.__J[e] = np.array([[dx21, dx31],
-                                    [dy21, dy31]])  # Jacobian            
-            self.__detJ[e] = dy31*dx21 - dx31*dy21  # Det of jacobian
-            self.__A[e] = 0.5 * self.__detJ[e]      # Area of cell
-            self.__InvJ[e] = (1/self.__detJ[e])*np.array([[dy31, -dx31],
-                                                          [-dy21, dx21]]) # Inverse of jacobian
+            self.__J[e], self.__detJ[e], self.__InvJ[e] = self.element.compute_ele_properties(self.__nodes[con])
             
 
         # Evaluate 'Mass' and 'Stiffness' matrix. These DO NOT change with time or value of C
@@ -493,7 +479,7 @@ class CahnHilliardSolver2D:
     def __compute_mass(self, u):
         M = 0
         for e,con in enumerate(self.__connectivity):
-            M += self.element.compute_mass_e(self.__A[e], u[con])
+            M += self.element.compute_mass(self.__detJ[e],u[con])
         return M
     
     def __compute_energy(self, u):
