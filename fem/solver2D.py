@@ -8,9 +8,9 @@ from scipy.sparse import csc_matrix, bmat
 import scipy.sparse.linalg as linalg
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-from ._elements import LinearTriangularElement
+from ._elements import LinearTriangularElement, LinearRectElement, QuadraticRectElement
 from ._config import _progress_range, STABILIZATION_CONSTANT, tqdm
-from ._mesh import generate_circular_domain, generate_rectangular_domain
+from ._mesh import generate_circular_domain, generate_rectangular_domain, generate_rect_mesh
 
 TIME_INTEGRATOR_STR2INT_MAP = {
                                 'implicit': 1,
@@ -37,16 +37,22 @@ class CahnHilliardSolver2D:
         # Nodes and connectivity
         self.__nodes = nodes
         self.__connectivity = connectivity
-        self.__tri = Triangulation(self.__nodes[:,0], self.__nodes[:,1], self.__connectivity)
+
+        self.__n = len(self.__connectivity[0])
+        if self.__n == 3:
+            self.element = LinearTriangularElement()
+            self.__tri = Triangulation(self.__nodes[:,0], self.__nodes[:,1], self.__connectivity)
+        elif self.__n == 4:
+            self.element = LinearRectElement()
+            self.__tri = None
+        elif self.__n == 9:
+            self.element = QuadraticRectElement()
+        else:
+            raise ValueError(f"No compatible element for a {self.__n} point element.")
+
         # Number of nodes and elements
         self.__N = len(self.__nodes)
         self.__Ne = len(self.__connectivity)
-        
-        # Check what element corresponds to the mesh
-        if len(self.__connectivity[0]) == 3:
-            self.element = LinearTriangularElement()
-        else:
-            raise ValueError(f"No compatible element for a {len(connectivity)} point element.")
 
         # Preprocessing
         self.__preprocessing()
@@ -80,7 +86,8 @@ class CahnHilliardSolver2D:
         self.K = self.__assemble_K()
 
     
-    def solve(self, u0, T:float, dt:float, time_integrator:str|int = 'explicit', nonlinear_solver_options:dict = {}):
+    def solve(self, u0, T:float, dt:float, time_integrator:str|int = 'explicit', nonlinear_solver_options:dict = {}, 
+              terminate_solver = True):
         
         self.__T = T
         self.__dt = dt
@@ -129,14 +136,14 @@ class CahnHilliardSolver2D:
         # TIME STEPPING
         # return
         print()
-        self.__termination_flag = _time_stepper()
+        self.__termination_flag = _time_stepper(terminate_solver)
         tqdm.write("Simulation ended.\n")
         
     
     
     ########################################################################
     # SEMI-IMPLICIT B TIME STEPPING
-    def _semi_implicit_B(self):
+    def _semi_implicit_B(self,terminate_solver):
         """Semi-Implicit methods Case B"""
 
         b = np.zeros((self.__N*2,))
@@ -159,7 +166,7 @@ class CahnHilliardSolver2D:
             # SOLVE
             self.__u[it] = lu.solve(b)
 
-            flag = self.__checks(it)
+            flag = self.__checks(it,terminate_solver)
 
             if flag != 0:
                 return 1
@@ -177,7 +184,7 @@ class CahnHilliardSolver2D:
     ########################################################################
     # 1ST-ORDER STABILIZED SEMI-IMPLICIT SCHEME (1SSI)
 
-    def _1SSI_scheme(self):
+    def _1SSI_scheme(self,terminate_solver):
         """
         1st-order Stabilized Semi-Implicit Scheme (1SSI)
         
@@ -193,21 +200,21 @@ class CahnHilliardSolver2D:
         lu = linalg.splu(A)
         for it in _progress_range(range(1,self.__nt),desc = "Simulation running"):
             # Update RHS
-            self.__update_rhs_1SSI(b, self.__u[it-1,:self.__N], STABILIZATION_CONSTANT)
+            self.__update_rhs_1SSI(b, self.__u[it-1,:self.__N])
             
             # SOLVE
             self.__u[it] = lu.solve(b)
 
-            flag = self.__checks(it)
+            flag = self.__checks(it,terminate_solver)
 
             if flag != 0:
                 return self.__u[:it-1,:]
         
-    def __update_rhs_1SSI(self, b, evaluation_C, S):
+    def __update_rhs_1SSI(self, b, evaluation_C):
         """Assemble non-linear vector for 1st order stabilized semi-implicit scheme"""
         temp = (self.M@evaluation_C)
         b[self.__N:] = temp
-        b[:self.__N] = -temp - S*temp
+        b[:self.__N] = -temp - STABILIZATION_CONSTANT*temp
         for e,con in enumerate(self.__connectivity):
             self.element._c3(b, con, self.__detJ[e], evaluation_C[con])
         b[:self.__N] *= 1/self.epsilon
@@ -216,7 +223,7 @@ class CahnHilliardSolver2D:
     ########################################################################
     # 2ND ORDER STABILIZED SEMI-IMPLICIT SCHEME (2SSI)
 
-    def _2SSI_scheme(self):
+    def _2SSI_scheme(self, terminate_solver):
         """
         2nd-order Stabilized Semi-Implicit Scheme (2SSI)
         
@@ -226,55 +233,60 @@ class CahnHilliardSolver2D:
         # USE A TIME STEP OF 1SSI
         # Since the scheme is second order, we require two previous computations to propagate solution
         # Compute LHS: This is done once for stencil B
+        dt1 = 1e-6
         A11 = -self.epsilon*self.K - STABILIZATION_CONSTANT/self.epsilon*self.M
         A = bmat([[A11 ,    self.M],
-                  [self.M,  self.__dt*self.K]], format='csc')
+                  [self.M,  dt1*self.K]], format='csc')
         b = np.zeros((self.__N*2,))
         
         # Pre-compute LU factorisation
         lu = linalg.splu(A)
-        # Update RHS
-        self.__update_rhs_1SSI(b, self.__u[0,:self.__N], STABILIZATION_CONSTANT)
-        # Solve
-        self.__u[1] = lu.solve(b)
-        # Run checks
-        flag = self.__checks(1)
 
+        # Update RHS
+        self.__update_rhs_1SSI(b, self.__u[0,:self.__N])
+        # Solve
+        u2 = lu.solve(b)
+        
 
         # START USING 2SSI  
         A11 = -self.epsilon*self.K - STABILIZATION_CONSTANT/self.epsilon*self.M
         A = bmat([[A11 ,    self.M],
                   [self.M,  2/3*self.__dt*self.K]], format='csc')
         lu = linalg.splu(A)
+
+        self.__update_rhs_2SSI(b, self.__u[0,:self.__N], u2[:self.__N])
+        
+        # Solve
+        self.__u[1] = lu.solve(b)
+        
+        # Run checks
+        flag = self.__checks(1, terminate_solver=terminate_solver)
+
+        
         
         for it in _progress_range(range(2,self.__nt), desc = "Simulation running"):
             # Update RHS
-            self.__update_rhs_2SSI(b, self.__u[it-2,:self.__N], self.__u[it-1,:self.__N], STABILIZATION_CONSTANT)
+            self.__update_rhs_2SSI(b, self.__u[it-2,:self.__N], self.__u[it-1,:self.__N])
             
             # SOLVE
             self.__u[it] = lu.solve(b)
 
-            flag = self.__checks(it)
+            flag = self.__checks(it,terminate_solver)
 
             if flag != 0:
                 return self.__u[:it-1,:]
         
-    def __update_rhs_2SSI(self, b, evaluation_C1, evaluation_C2, S):
+    def __update_rhs_2SSI(self, b, evaluation_C1, evaluation_C2):
         """Assemble non-linear vector for 1st order stabilized semi-implicit scheme"""
-        Mc1 = (self.M@evaluation_C1)
-        Mc2 = (self.M@evaluation_C2)
-        
         phi1 = np.zeros((self.__N,))
         phi2 = np.zeros((self.__N,))
-        phi1[:] = -Mc1
-        phi2[:] = -Mc2
         for e,con in enumerate(self.__connectivity):
             self.element._c3(phi1, con,self.__detJ[e], evaluation_C1[con])
             self.element._c3(phi2, con,self.__detJ[e], evaluation_C2[con])
-        b[:self.__N] = -2*S*Mc2 + S*Mc1 + 2*(phi2) - phi1
+        b[:self.__N] = -2*(STABILIZATION_CONSTANT + 1)*self.M@evaluation_C2 + 2*phi2 +\
+                          (STABILIZATION_CONSTANT + 1)*self.M@evaluation_C1 - phi1
         b[:self.__N] *= 1/self.epsilon
-        b[self.__N:] = 4/3*Mc2 - 1/3*Mc1
-
+        b[self.__N:] = self.M@(1/3*(4*evaluation_C2 - evaluation_C1))
 
     ####################################################################
     # ASSEMBLE GLOBAL LINEAR SYSTEMS
@@ -304,11 +316,19 @@ class CahnHilliardSolver2D:
     #####################################################################
     # CONSTRUCTORS
     @classmethod
-    def rectangular_domain(cls, epsilon, height, width, mesh_size = 0.08):
+    def rectangular_domain_tri(cls, epsilon, height, width, mesh_size = 0.08):
         """
         Generate a 2D triangular mesh of a rectangle height x width.
         """
         nodes, connectivity = generate_rectangular_domain(height=height, width=width, mesh_size=mesh_size)
+        return cls(epsilon=epsilon, nodes=nodes, connectivity=connectivity)
+    
+    @classmethod
+    def rectangular_domain_rect(cls, epsilon, height, width, nx, ny, order):
+        """
+        Generate a 2D triangular mesh of a rectangle height x width.
+        """
+        nodes, connectivity = generate_rect_mesh(nx, ny, width, height, order=order)
         return cls(epsilon=epsilon, nodes=nodes, connectivity=connectivity)
     
     @classmethod
@@ -327,7 +347,18 @@ class CahnHilliardSolver2D:
         if plot_nodes:
             ax.plot(self.__nodes[:,0], self.__nodes[:,1], '.', color = node_color, ms = node_size)
         
-        ax.triplot(self.__tri, linewidth = linewidth, color = color)
+        if self.__tri:
+            ax.triplot(self.__tri, linewidth = linewidth, color = color)
+        else:
+            if self.element.n == 9:
+                end = self.__n-1
+            else:
+                end = self.__n
+
+            for e, con in enumerate(self.__connectivity):
+                temp = np.vstack([self.__nodes[con[:end]],self.__nodes[con[0]]])
+                plt.plot(*temp, '-', color = color, linewidth= linewidth)
+
 
     def plot_solution(self, z, ax = None, cmap = 'jet', levels = 100, plot_mesh = False, **kwargs):
         if ax is None:
@@ -471,32 +502,32 @@ class CahnHilliardSolver2D:
             E += self.element.compute_energy(self.__detJ[e], self.__InvJ[e], u[con], self.epsilon)
         return E
     
-    def __checks(self, it):
+    def __checks(self, it, terminate_solver = True):
         # Compute Conserved quantities
         self.__mass[it] = self.__compute_mass(self.__u[it])
         self.__energy[it] = self.__compute_energy(self.__u[it])
 
-        if not np.isclose(self.__mass[it], self.__mass[0]):
-            print(f"\nERROR IN ITERATION: {it:4d}")
-            print("MASS IS NOT BEING CONSERVED!!!!!!!!!!!!!!!!!!")
-            print(self.__mass[0], self.__mass[it])
-            self.__t = self.__t[:it+1]
-            self.__mass = self.__mass[:it+1]
-            self.__energy = self.__energy[:it+1]
-            self.__u = self.__u[:it+1,:]
-            return 1
-        elif (self.__energy[it]-self.__energy[it-1])/self.__energy[it-1] > 0.01:
-            print(f"\nERROR IN ITERATION: {it:4d}")
-            print("J INCREASING!!!!!!!!!!!!!!!!!!")
-            print(self.__energy[it-1], self.__energy[it], )
-            self.__t = self.__t[:it+1]
-            self.__mass = self.__mass[:it+1]
-            self.__energy = self.__energy[:it+1]
-            self.__u = self.__u[:it+1,:]
-            return 2
-        else:
-            return 0
-    
+        if terminate_solver:
+            if not np.isclose(self.__mass[it], self.__mass[0]):
+                tqdm.write(f"\nERROR IN ITERATION: {it:4d}")
+                tqdm.write("MASS IS NOT BEING CONSERVED!!!!!!!!!!!!!!!!!!")
+                tqdm.write(f"{self.__mass[it]:.6e}, {self.__mass[it]:.6e}")
+                self.__t = self.__t[:it+1]
+                self.__mass = self.__mass[:it+1]
+                self.__energy = self.__energy[:it+1]
+                self.__u = self.__u[:it+1,:]
+                return 1
+            elif (self.__energy[it]-self.__energy[it-1])/self.__energy[it-1] > 0.01:
+                tqdm.write(f"\nERROR IN ITERATION: {it:4d}")
+                tqdm.write("J INCREASING!!!!!!!!!!!!!!!!!!")
+                tqdm.write(f"{self.__energy[it-1] - self.__energy[it]:.6e}")
+                self.__t = self.__t[:it+1]
+                self.__mass = self.__mass[:it+1]
+                self.__energy = self.__energy[:it+1]
+                self.__u = self.__u[:it+1,:]
+                return 2
+
+        return 0
     
     
     ######################################################

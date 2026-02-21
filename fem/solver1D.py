@@ -55,7 +55,8 @@ class CahnHilliardSolver1D():
         self.K = self.__assemble_K()
         
         
-    def solve(self, u0, T:float, dt:float, time_integrator:str|int = 'explicit', nonlinear_solver_options:dict = {}):
+    def solve(self, u0, T:float, dt:float, time_integrator:str|int = 'explicit', nonlinear_solver_options:dict = {},
+              terminate_run = True):
         
         self.__T = T
         self.__dt = dt
@@ -112,36 +113,36 @@ class CahnHilliardSolver1D():
         # TIME STEPPING
 
         print()
-        _time_stepper()
+        _time_stepper(terminate_run)
         tqdm.write("Simulation ended.")
 
 
 
-    def __checks(self, it):
+    def __checks(self, it, terminate_run):
         # Compute Conserved quantities
         self.__mass[it] = self.__compute_mass(self.__u[it])
         self.__J[it] = self.__compute_J(self.__u[it])
 
-        if not np.isclose(self.__mass[it], self.__mass[0]):
-            print(f"\nERROR IN ITERATION: {it:4d}")
-            print("MASS IS NOT BEING CONSERVED!!!!!!!!!!!!!!!!!!")
-            print(self.__mass[0], self.__mass[it])
-            self.__t = self.__t[:it+1]
-            self.__mass = self.__mass[:it+1]
-            self.__J = self.__J[:it+1]
-            self.__u = self.__u[:it+1,:]
-            return 1
-        elif (self.__J[it]-self.__J[it-1])/self.__J[it-1] > 0.01:
-            print(f"\nERROR IN ITERATION: {it:4d}")
-            print("J INCREASING!!!!!!!!!!!!!!!!!!")
-            print(self.__J[it-1], self.__J[it], )
-            self.__t = self.__t[:it+1]
-            self.__mass = self.__mass[:it+1]
-            self.__J = self.__J[:it+1]
-            self.__u = self.__u[:it+1,:]
-            return 2
-        else:
-            return 0
+        if terminate_run:
+            if not np.isclose(self.__mass[it], self.__mass[0]):
+                print(f"\nERROR IN ITERATION: {it:4d}")
+                print("MASS IS NOT BEING CONSERVED!!!!!!!!!!!!!!!!!!")
+                print(self.__mass[0], self.__mass[it])
+                self.__t = self.__t[:it+1]
+                self.__mass = self.__mass[:it+1]
+                self.__J = self.__J[:it+1]
+                self.__u = self.__u[:it+1,:]
+                return 1
+            elif (self.__J[it]-self.__J[it-1])/self.__J[it-1] > 0.01:
+                print(f"\nERROR IN ITERATION: {it:4d}")
+                print("J INCREASING!!!!!!!!!!!!!!!!!!")
+                print(self.__J[it-1], self.__J[it], )
+                self.__t = self.__t[:it+1]
+                self.__mass = self.__mass[:it+1]
+                self.__J = self.__J[:it+1]
+                self.__u = self.__u[:it+1,:]
+                return 2
+        return 0
 
     ####################################################################
     # ASSEMBLE GLOBAL LINEAR SYSTEMS
@@ -188,14 +189,14 @@ class CahnHilliardSolver1D():
     
     ########################################################################
     # EXPLICIT TIME STEPPING
-    def _explicit(self):
+    def _explicit(self, terminate_run):
         """Explicit time stepping"""
         # Precompute LU factorisation of Mass matrix
         lu = linalg.splu(self.M)
         for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
             self.__u[it] = self._step_explicit(self.__u[it-1], lu)
 
-            flag = self.__checks(it)
+            flag = self.__checks(it, terminate_run=terminate_run)
 
             if flag != 0:
                 break
@@ -221,7 +222,7 @@ class CahnHilliardSolver1D():
     ########################################################################
     # IMPLICIT TIME STEPPING
     
-    def _implicit(self):
+    def _implicit(self, terminate_run):
         """Implicit time stepping"""
         def Residual(u_prev, u):
             res = np.zeros((2*self.__N))
@@ -238,15 +239,15 @@ class CahnHilliardSolver1D():
         for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
             self.__u[it] = self._NewtonRaphson(self.__u[it-1], Jac, Residual, **self.__nonlinear_solver_parameters)
 
-            flag = self.__checks(it)
-
+            flag = self.__checks(it, terminate_run=terminate_run)
+            
             if flag != 0:
                 return self.__u[:it-1,:]
     
     
     ########################################################################
     # SEMI-IMPLICIT A TIME STEPPING
-    def _semi_implicit_A(self):
+    def _semi_implicit_A(self, terminate_run):
         """EYRRE solver, case A"""
         
         def Residual(u_prev, u):
@@ -267,7 +268,8 @@ class CahnHilliardSolver1D():
         for it in _progress_range(range(1,self.__nt), desc = "Simulation running"):
             self.__u[it] = self._NewtonRaphson(self.__u[it-1], Jac, Residual, **self.__nonlinear_solver_parameters)
             
-            flag = self.__checks(it)
+            flag = self.__checks(it, terminate_run=terminate_run)
+
 
             if flag != 0:
                 return self.__u[:it-1,:]
@@ -293,7 +295,7 @@ class CahnHilliardSolver1D():
     
     ########################################################################
     # SEMI-IMPLICIT B TIME STEPPING
-    def _semi_implicit_B(self):
+    def _semi_implicit_B(self, terminate_run):
         """Semi-Implicit methods Case B"""
 
         # Used for Semi-Implicit methods B
@@ -311,8 +313,8 @@ class CahnHilliardSolver1D():
             # SOLVE
             self.__u[it] = lu.solve(b)
 
-            flag = self.__checks(it)
-
+            flag = self.__checks(it, terminate_run=terminate_run)
+            
             if flag != 0:
                 return self.__u[:it-1,:]
         
@@ -329,7 +331,7 @@ class CahnHilliardSolver1D():
     ########################################################################
     # 1st-order Semi-Implicit Scheme (1SI)
 
-    def _1SI_scheme(self):
+    def _1SI_scheme(self, terminate_run):
         """
         1st-order Semi-Implicit Scheme (1SI)
         
@@ -350,7 +352,7 @@ class CahnHilliardSolver1D():
             # SOLVE
             self.__u[it] = lu.solve(b)
 
-            flag = self.__checks(it)
+            flag = self.__checks(it, terminate_run=terminate_run)
 
             if flag != 0:
                 return self.__u[:it-1,:]
@@ -371,7 +373,7 @@ class CahnHilliardSolver1D():
     ########################################################################
     # 1st-order Stabilized Semi-Implicit Scheme (1SSI)
 
-    def _1SSI_scheme(self):
+    def _1SSI_scheme(self, terminate_run):
         """
         1st-order Stabilized Semi-Implicit Scheme (1SSI)
         
@@ -393,7 +395,7 @@ class CahnHilliardSolver1D():
             self.__u[it] = lu.solve(b)
             # self.__u[it] = linalg.cg(A, b)
 
-            flag = self.__checks(it)
+            flag = self.__checks(it, terminate_run=terminate_run)
 
             if flag != 0:
                 return self.__u[:it-1,:]
@@ -415,7 +417,7 @@ class CahnHilliardSolver1D():
     ########################################################################
     # 2nd order Stabilized Semi-Implicit Scheme (2SSI)
 
-    def _2SSI_scheme(self):
+    def _2SSI_scheme(self, terminate_run):
         """
         2nd-order Stabilized Semi-Implicit Scheme (2SSI)
         
@@ -437,7 +439,7 @@ class CahnHilliardSolver1D():
         # Solve
         self.__u[1] = lu.solve(b)
         # Run checks
-        flag = self.__checks(1)
+        flag = self.__checks(1, terminate_run=terminate_run)
 
 
         # START USING 2SSI  
@@ -453,29 +455,40 @@ class CahnHilliardSolver1D():
             # SOLVE
             self.__u[it] = lu.solve(b)
 
-            flag = self.__checks(it)
-
+            flag = self.__checks(it, terminate_run=terminate_run)
+            
             if flag != 0:
                 return self.__u[:it-1,:]
         
     def __update_rhs_2SSI(self, b, evaluation_C1, evaluation_C2, S):
         """Assemble non-linear vector for 1st order stabilized semi-implicit scheme"""
-        Mc1 = (self.M@evaluation_C1)
-        Mc2 = (self.M@evaluation_C2)
+        # Mc1 = (self.M@evaluation_C1)
+        # Mc2 = (self.M@evaluation_C2)
         
+        # phi1 = np.zeros((self.__N,))
+        # phi2 = np.zeros((self.__N,))
+        # phi1[:] = -Mc1
+        # phi2[:] = -Mc2
+        # for e in range(self.__Ne):
+        #     i = e*self.element.degree
+        #     he = self.x[i+self.element.n-1] - self.x[i]    
+        #     self.element._c3(phi1[i:i+self.element.n], he, evaluation_C1[i:i+self.element.n])
+        #     self.element._c3(phi2[i:i+self.element.n], he, evaluation_C2[i:i+self.element.n])
+        # b[:self.__N] = -2*S*Mc2 + S*Mc1 + 2*(phi2) - phi1
+        # b[:self.__N] *= 1/self.epsilon
+        # b[self.__N:] = 4/3*Mc2 - 1/3*Mc1
+
         phi1 = np.zeros((self.__N,))
         phi2 = np.zeros((self.__N,))
-        phi1[:] = -Mc1
-        phi2[:] = -Mc2
         for e in range(self.__Ne):
             i = e*self.element.degree
             he = self.x[i+self.element.n-1] - self.x[i]    
             self.element._c3(phi1[i:i+self.element.n], he, evaluation_C1[i:i+self.element.n])
             self.element._c3(phi2[i:i+self.element.n], he, evaluation_C2[i:i+self.element.n])
-        b[:self.__N] = -2*S*Mc2 + S*Mc1 + 2*(phi2) - phi1
+        b[:self.__N] = -2*(STABILIZATION_CONSTANT + 1)*self.M@evaluation_C2 + 2*phi2 +\
+                          (STABILIZATION_CONSTANT + 1)*self.M@evaluation_C1 - phi1
         b[:self.__N] *= 1/self.epsilon
-        b[self.__N:] = 4/3*Mc2 - 1/3*Mc1
-
+        b[self.__N:] = self.M@(1/3*(4*evaluation_C2 - evaluation_C1))
 
 
 

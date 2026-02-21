@@ -38,16 +38,15 @@ if __name__ == '__main__':
     # time_integrator = '1ssi'
 
     
-    # # 2ND ORDER STABILIZED SEMI IMPLICIT SCHEME
-    # dt = 1e-5
-    # time_integrator = '2ssi'
+    # 2ND ORDER STABILIZED SEMI IMPLICIT SCHEME
+    dt = 1e-4
+    time_integrator = '2ssi'
 
 
     ###################################################
     # General Parameters
     epsilon = 0.01
     L = 1
-    poly_degree = 2
     
     # Initial conditions
     def c0(x): return np.cos(np.pi/L*x)
@@ -55,29 +54,13 @@ if __name__ == '__main__':
     # T
     tEnd = dt*1
     tEnd = 1e-3
-    # tEnd = 5e-3
+    tEnd = 5e-3
     
-    save = True
-
-    for N in [4, 10, 50, 100, 500, 1000, 5000]:
-        # Nonlinear solver
-        sol = CahnHilliardSolver1D(epsilon, 
-                                number_of_elements=N, L = L, 
-                                polynomial_order=poly_degree)
-        
-        nonlinear_solver_options = {'run_checks': False,
-                            #  'line_search': 'armijo',
-                            #  'relaxation_parameter': 0.8,
-                            'verbose' : False,
-                            }
-        sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
-        if save:
-            sol.save()
-
-
-    N = 100
-    dts = [tEnd/i for i in [10, 20, 100, 200, 1000]]
-
+    #########################################################################
+    # JUST RUN
+    poly_degree = 1
+    N = 20
+    
     sol = CahnHilliardSolver1D(epsilon, 
                                 number_of_elements=N, L = L, 
                                 polynomial_order=poly_degree)        
@@ -86,10 +69,53 @@ if __name__ == '__main__':
                         #  'relaxation_parameter': 0.8,
                         'verbose' : False,
                         }
-    for dt in dts:
-        sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
-        if save:
-            sol.save()
+    sol.solve(c0, tEnd, dt, time_integrator=time_integrator, 
+              nonlinear_solver_options=nonlinear_solver_options,
+              terminate_run=True)
+
+
+
+    ##########################################################################
+    # RUN CONVERGENCE STUDIES
+    save = False
+    poly_degree = 1
+
+
+    # for N in [4, 10, 50, 100, 500, 1000, 5000]:
+    #     # Nonlinear solver
+    #     sol = CahnHilliardSolver1D(epsilon, 
+    #                             number_of_elements=N, L = L, 
+    #                             polynomial_order=poly_degree)
+        
+    #     nonlinear_solver_options = {'run_checks': False,
+    #                         #  'line_search': 'armijo',
+    #                         #  'relaxation_parameter': 0.8,
+    #                         'verbose' : False,
+    #                         }
+    #     sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
+    #     if save:
+    #         sol.save()
+
+
+    # N = 500
+    # dts = [tEnd/i for i in [10, 20, 100, 200, 1000]]
+
+    # sol = CahnHilliardSolver1D(epsilon, 
+    #                             number_of_elements=N, L = L, 
+    #                             polynomial_order=poly_degree)        
+    # nonlinear_solver_options = {'run_checks': False,
+    #                     #  'line_search': 'armijo',
+    #                     #  'relaxation_parameter': 0.8,
+    #                     'verbose' : False,
+    #                     }
+    # for dt in dts:
+    #     sol.solve(c0, tEnd, dt, time_integrator=time_integrator, nonlinear_solver_options=nonlinear_solver_options)
+    #     if save:
+    #         sol.save()
+
+
+
+
 
     ###############################################################
     #  PLOTTING
@@ -111,6 +137,7 @@ if __name__ == '__main__':
 
     fig2, ax2 = plt.subplots(1,2)
     ax2[0].semilogy(sol.t[1:], abs(sol.mass[1:]- sol.mass[0]))
+    # ax2[1].plot(sol.t[1:], np.diff(sol.J))
     ax2[1].plot(sol.t, sol.J)
     
     ax2[0].set_title('$\\mathcal{M}(C)$')
@@ -118,7 +145,7 @@ if __name__ == '__main__':
     ax2[1].set_title('$\\mathcal{J}(C)$')
 
     [_.grid() for _ in ax2]
-    [_.ticklabel_format(style='scientific', axis='x', scilimits=(0, 0)) for _ in ax2]
+    # [_.ticklabel_format(style='scientific', axis='x', scilimits=(0, 0)) for _ in ax2]
     [_.set_xlabel('t') for _ in ax2]
     fig2.tight_layout()
 

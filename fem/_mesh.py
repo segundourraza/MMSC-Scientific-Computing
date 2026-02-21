@@ -24,7 +24,7 @@ def generate_rectangular_domain(height, width, mesh_size = 0.08):
         if cell_block.type == "triangle":
             connectivity = cell_block.data
             break
-        
+    return nodes, connectivity
         
 def generate_circular_domain(radius, mesh_size = 0.08):
     with pygmsh.geo.Geometry() as geom:
