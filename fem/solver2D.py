@@ -60,11 +60,10 @@ class CahnHilliardSolver2D:
     def __preprocessing(self,):
 
         # Compute Jacobian
-        self.__J = [0]*self.__Ne
         self.__detJ = np.zeros((self.__Ne,))
         self.__InvJ = [0]*self.__Ne
         for e,con in enumerate(self.__connectivity):
-            self.__J[e], self.__detJ[e], self.__InvJ[e] = self.element.compute_ele_properties(self.__nodes[con])
+            self.__detJ[e], self.__InvJ[e] = self.element.compute_ele_properties(self.__nodes[con])
             
 
         # Evaluate 'Mass' and 'Stiffness' matrix. These DO NOT change with time or value of C

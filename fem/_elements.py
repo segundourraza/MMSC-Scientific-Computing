@@ -255,6 +255,7 @@ class _LegendreElement2D(ABC):
     @abstractmethod
     def compute_ele_properties(self,nodes):...
 
+    
 
     def Me(self, M_global, con, detJ):
         M_global[np.ix_(con,con)] += detJ*self._M
@@ -270,6 +271,7 @@ class _LegendreElement2D(ABC):
             ch = np.dot(Ce, phi)
             ch3 = (ch)**3
             N[con] += (ch3 - ch)*phi*detJ*wi
+    
     ################################################################
     # TIME STEPPING SPECIFIC MATRICES
 
@@ -360,11 +362,15 @@ class LinearTriangularElement(_LegendreElement2D):
         dy31 = y3 - y1
 
         J = np.array([[dx21, dx31],
-                         [dy21, dy31]])
+                      [dy21, dy31]])
+        if not np.allclose(J,nodes[:,:2].T@self.grad_basis_function(0,0)):
+            raise ValueError
+
+
         detJ = dy31*dx21 - dx31*dy21
         invJ = 1/detJ*np.array([[dy31, -dx31],
                                 [-dy21, dx21]])
-        return J, detJ, invJ
+        return detJ, invJ
     
     
 class LinearRectElement(_LegendreElement2D):
@@ -405,10 +411,10 @@ class LinearRectElement(_LegendreElement2D):
     
     @staticmethod
     def grad_basis_function(xi, eta):
-        return 0.25*np.array([[-1, -1],
-                              [1,  -1],
-                              [-1,  1],
-                              [1,   1]], dtype = float)
+        return 0.25*np.array([[-1 + eta, -1 + xi],
+                              [ 1 - eta, -1 - xi],
+                              [-1 - eta,  1 - xi],
+                              [ 1 + eta,  1 + xi]])
 
     @staticmethod
     def quadrature_points(n_points):

@@ -107,6 +107,8 @@ if __name__ == '__main__':
     # sol = CahnHilliardSolver2D.rectangular_domain_rect(epsilon, a, b, nx, ny, order)
     # sol.plot_mesh()
 
+    # plt.show()
+
     sol.solve(c0, tEnd, dt, time_integrator=time_integrator,
               terminate_solver=False
               )
