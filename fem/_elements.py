@@ -304,4 +304,23 @@ class LinearTriangularElement():
         return area*np.sum(Ce)/3
     
 
+class LinearRectangularElement():
 
+    n:int = 4
+    d:int = 1
+
+    @staticmethod
+    def basis_functions(xi, eta):
+        return np.array([0.25*(1 - xi)*(1-eta),
+                         0.25*(1 + xi)*(1-eta),
+                         0.25*(1 - xi)*(1+eta),
+                         0.25*(1 + xi)*(1+eta)], dtype = float)
+    
+    
+    @staticmethod
+    def grad_basis_functions(xi, eta):
+        return 0.25*np.array([[-1, -1],
+                              [1,  -1],
+                              [-1,  1],
+                              [1,   1]], dtype = float)
+    

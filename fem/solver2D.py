@@ -1,4 +1,4 @@
-import pygmsh, os, h5py
+import h5py
 from datetime import timezone, datetime
 from pathlib import Path
 import numpy as np
@@ -10,6 +10,7 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 
 from ._elements import LinearTriangularElement
 from ._config import _progress_range, STABILIZATION_CONSTANT, tqdm
+from ._mesh import generate_circular_domain, generate_rectangular_domain
 
 TIME_INTEGRATOR_STR2INT_MAP = {
                                 'implicit': 1,
@@ -304,50 +305,18 @@ class CahnHilliardSolver2D:
     # CONSTRUCTORS
     @classmethod
     def rectangular_domain(cls, epsilon, height, width, mesh_size = 0.08):
-        
-        poly_pts = [
-            [0.0,   0.0,    0.0],
-            [width, 0.0,    0.0],
-            [width, height, 0.0],
-            [0.0,   height, 0.0],
-        ]
-
-        with pygmsh.geo.Geometry() as geom:
-            poly = geom.add_polygon(poly_pts, mesh_size=mesh_size)
-            mesh = geom.generate_mesh()
-        
-        nodes = mesh.points 
-        connectivity = None
-        for cell_block in mesh.cells:
-            if cell_block.type == "triangle":
-                connectivity = cell_block.data
-                break
-        
+        """
+        Generate a 2D triangular mesh of a rectangle height x width.
+        """
+        nodes, connectivity = generate_rectangular_domain(height=height, width=width, mesh_size=mesh_size)
         return cls(epsilon=epsilon, nodes=nodes, connectivity=connectivity)
     
     @classmethod
     def generate_circular_mesh(cls, epsilon, r=1.0, mesh_size=0.1):
         """
-        Generate a 2D triangular mesh of a disk of radius r.
-        
-        Returns:
-            points : (N,2) array
-            triangles : (M,3) connectivity
+        Generate a 2D triangular mesh of a disk of radius r.        
         """
-        with pygmsh.geo.Geometry() as geom:
-            geom.add_circle([0.0, 0.0, 0.0], r, mesh_size=mesh_size)
-            mesh = geom.generate_mesh()
-
-        nodes = mesh.points[1:, :2]
-
-        # Extract triangle cells
-        connectivity = None
-        for cell_block in mesh.cells:
-            if cell_block.type == "triangle":
-                connectivity = cell_block.data
-                break
-        connectivity -= 1
-
+        nodes, connectivity = generate_circular_domain(radius=r, mesh_size=mesh_size)
         return cls(epsilon=epsilon, nodes=nodes, connectivity=connectivity)
 
     #####################################################################
