@@ -39,12 +39,12 @@ class CahnHilliardSolver2D:
         self.__connectivity = connectivity
 
         self.__n = len(self.__connectivity[0])
+        self.__tri = None
         if self.__n == 3:
             self.element = LinearTriangularElement()
             self.__tri = Triangulation(self.__nodes[:,0], self.__nodes[:,1], self.__connectivity)
         elif self.__n == 4:
             self.element = LinearRectElement()
-            self.__tri = None
         elif self.__n == 9:
             self.element = QuadraticRectElement()
         else:
@@ -336,13 +336,13 @@ class CahnHilliardSolver2D:
             ax.triplot(self.__tri, linewidth = linewidth, color = color)
         else:
             if self.element.n == 9:
-                end = self.__n-1
+                for e, con in enumerate(self.__connectivity):
+                    temp = np.vstack([self.__nodes[con[:4]],self.__nodes[con[0]]]).T
+                    ax.plot(*temp, '-', color = color, linewidth= linewidth)
             else:
-                end = self.__n
-
-            for e, con in enumerate(self.__connectivity):
-                temp = np.vstack([self.__nodes[con[:end]],self.__nodes[con[0]]])
-                plt.plot(*temp, '-', color = color, linewidth= linewidth)
+                for e, con in enumerate(self.__connectivity):
+                    temp = np.vstack([self.__nodes[con],self.__nodes[con[0]]]).T
+                    ax.plot(*temp, '-', color = color, linewidth= linewidth)
 
 
     def plot_solution(self, z, ax = None, cmap = 'jet', levels = 100, plot_mesh = False, **kwargs):
@@ -353,12 +353,17 @@ class CahnHilliardSolver2D:
         vmax = kwargs.get('vmax', max(np.nanmax(z), 1.0))
 
         levels = np.linspace(vmin, vmax, levels)
-        tcf = ax.tricontourf(self.__tri, z, levels, cmap = cmap)
+        if self.__n == 3:
+            tcf = ax.tricontourf(self.__tri, z, levels, cmap = cmap)
+        else:
+            tcf = ax.tricontourf(self.__nodes[:,0], self.__nodes[:,1], z, levels, cmap = cmap)
+        
         if plot_mesh:
             self.plot_mesh(ax=ax, **kwargs)
+        
         return tcf, levels
 
-    def animate_solution(self, vector = 'c', fps = 10, cmap = 'jet', levels = 100, prepend = None, directory = None):
+    def animate_solution(self, vector = 'c', fps = 10, cmap = 'jet', levels = 100, prepend = None, directory = None, show_mesh = False):
 
         if vector == 'c':
             v = self.sol_c
@@ -391,13 +396,13 @@ class CahnHilliardSolver2D:
 
         vmin = np.nanmin(v)
         vmax = np.nanmax(v)
-        tcf = ax.tricontourf(self.__tri, v[0], levels, cmap = cmap, vmin= vmin, vmax = vmax)
+        tcf,_ = self.plot_solution(v[0], ax = ax, levels = levels, cmap = cmap, vmin= vmin, vmax = vmax, show_mesh=show_mesh)
         ax.set_title(f"Tme step: 0")
         cbar = fig.colorbar(tcf, ax=ax)
         
         def update(i):
             ax.clear()
-            tcf = ax.tricontourf(self.__tri, v[i], levels=levels, cmap = cmap, vmin= vmin, vmax = vmax)
+            tcf,_ = self.plot_solution(v[i], ax = ax, levels = levels, cmap = cmap, vmin= vmin, vmax = vmax, show_mesh=show_mesh)
             # cbar.update_normal(tcf)
             ax.set_title(f"Time step: {i}")
             return tcf

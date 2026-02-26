@@ -22,6 +22,10 @@ quad_grad_basis_function = [lambda x: -0.5*(1-2*x),
 
 class _LegendreElement(ABC):
 
+    def __init__(self):
+        super().__init__()
+        self.r_mass = int(np.ceil(0.5*(self.degree+1)))
+
     @property
     @abstractmethod
     def degree(self)->int:
@@ -131,7 +135,7 @@ class _LegendreElement(ABC):
 
     def compute_mass_e(self, he, Ce):
         M = 0
-        for xi, wi in zip(*np.polynomial.legendre.leggauss(self.degree)):
+        for xi, wi in zip(*np.polynomial.legendre.leggauss(self.r_mass)):
             phi = self.basis_functions(xi)
             ch = np.dot(Ce, phi)
             M += wi*(he/2)*ch
@@ -239,6 +243,9 @@ class _LegendreElement2D(ABC):
     
         if cls.r_Ne is None:
             raise TypeError("Subclasses must define 'r_Ne'")
+            
+        if cls.r_mass is None:
+            raise TypeError("Subclasses must define 'r_mass'")
     
     @staticmethod
     @abstractmethod
@@ -360,13 +367,7 @@ class LinearTriangularElement(_LegendreElement2D):
         dx21 = x2 - x1
         dy21 = y2 - y1
         dy31 = y3 - y1
-
-        J = np.array([[dx21, dx31],
-                      [dy21, dy31]])
-        if not np.allclose(J,nodes[:,:2].T@self.grad_basis_function(0,0)):
-            raise ValueError
-
-
+        
         detJ = dy31*dx21 - dx31*dy21
         invJ = 1/detJ*np.array([[dy31, -dx31],
                                 [-dy21, dx21]])
@@ -378,43 +379,44 @@ class LinearRectElement(_LegendreElement2D):
     n:int = 4
     degree:int = 1
     
-    r_Ne:int = -1
-    
-    _M = (1/9)*np.array([[4, 2, 2, 1],
-                          [2, 4, 1, 2],
-                          [2, 1, 4, 2],
-                          [1, 2, 2, 4]], dtype=float)
-    
-    _A   = 1/6*np.array([[2, -2, 1, -1],
-                         [-2, 2, -1, 1],
-                         [1, -1, 2, -2],
-                         [-1, 1, -2, 2]], dtype=float)
+    # Quadrature points
+    r_Ne:int = 3
+    r_mass: int = 1
 
-    _BpC = 1/2*np.array([[1, 0, 0 ,-1],
-                          [0, -1, 1, 0],
-                          [0, 1, -1, 0],
-                          [-1, 0, 0, 1]], dtype=float)
+    _M = (1/9)*np.array([[4, 2, 2, 1],
+                         [2, 4, 1, 2],
+                         [2, 1, 4, 2],
+                         [1, 2, 2, 4]], dtype=float)
     
-    _D   = 1/6*np.array([[2, 1, -2, -1],
-                          [1, 2, -1, -2],
-                          [-2, -1, 2, 1],
-                          [-1, -2, 1, 2]], dtype=float)
-    
-    
+    _A   = 1/6*np.array([[ 2, -2, -1,  1],
+                         [-2,  2,  1, -1],
+                         [-1,  1,  2, -2],
+                         [ 1, -1, -2,  2]], dtype=float)
+
+    _D = 1/6*np.array([[ 2,  1,  -1, -2],
+                       [ 1,  2,  -2, -1],
+                       [-1, -2,  2,  1],
+                       [-2, -1,  1,  2]], dtype=float)
+
+    _BpC = 1/2*np.array([[ 1,  0, -1,  0],
+                         [ 0, -1,  0,  1],
+                         [-1,  0,  1,  0],
+                         [ 0,  1,  0, -1]], dtype=float)
+   
     @staticmethod
     def basis_functions(xi, eta):
-        return np.array([0.25*(1 - xi)*(1-eta),
-                         0.25*(1 + xi)*(1-eta),
-                         0.25*(1 - xi)*(1+eta),
-                         0.25*(1 + xi)*(1+eta)], dtype = float)
-    
+        return 0.25*np.array([(1 - xi)*(1-eta),
+                              (1 + xi)*(1-eta),
+                              (1 + xi)*(1+eta),
+                              (1 - xi)*(1+eta)], dtype = float)
     
     @staticmethod
     def grad_basis_function(xi, eta):
         return 0.25*np.array([[-1 + eta, -1 + xi],
                               [ 1 - eta, -1 - xi],
-                              [-1 - eta,  1 - xi],
-                              [ 1 + eta,  1 + xi]])
+                              [ 1 + eta,  1 + xi],
+                              [-1 - eta,  1 - xi]
+                              ])
 
     @staticmethod
     def quadrature_points(n_points):
@@ -423,32 +425,34 @@ class LinearRectElement(_LegendreElement2D):
         return np.vstack([X.ravel(), Y.ravel()]).T, np.outer(w,w).ravel()
     
     def compute_ele_properties(self, nodes):
-        x1, x2, x3, x4 = nodes[:,0]
-        y1, y2, y3, y4 = nodes[:,1]
-
-        dx31 = x3 - x1
-        dx21 = x2 - x1
-        dy21 = y2 - y1
-        dy31 = y3 - y1
-
-        J = np.array([[dx21, dx31],
-                         [dy21, dy31]])
-        detJ = dy31*dx21 - dx31*dy21
-        A = 0.5*detJ
-        invJ = 1/detJ*np.array([[dy31, -dx31],
-                                [-dy21, dx21]])
-        return J, detJ, A, invJ
-
+        J = nodes[:,:2].T@self.grad_basis_function(-1,-1)
+        a = nodes[1,0] - nodes[0,0] # width
+        b = nodes[2,1] - nodes[1,1] # height
+        if J[0,0] == a/2 and J[1,1] == b/2:
+            return a*b/4, np.diag([2/a, 2/b])
+        else:
+            raise ValueError("Rectangular element is not aligned with axis")
+            
 class QuadraticRectElement(_LegendreElement2D):
 
     n:int = 9
-    degree:int = 1
+    degree:int = 2
     
+    # Quadrature points
+    r_Ne:int = 5
+    r_mass: int = 3
+
     
-    
-    r_Ne:int = -1
-    
-    
+    _M = (1/225)*np.array([[16, -4, 1, -4, 8, -2, -2, 8, 4],
+                           [-4, 16, -4, 1, 8, 8, -2, -2, 4],
+                           [1, -4, 16, -4, -2, 8, 8, -2, 4],
+                           [-4, 1, -4, 16, -2, -2, 8, 8, 4],
+                           [8, 8, -2, -2, 64, 4, -16, 4, 32],
+                           [-2, 8, 8, -2, 4, 64, 4, -16, 32],
+                           [-2, -2, 8, 8, -16, 4, 64, 4, 32],
+                           [8, -2, -2, 8, 4, -16, 4, 64, 32],
+                           [4, 4, 4, 4, 32, 32, 32, 32, 256]], dtype = float)
+
     _A = 1/90 * np.array([[28, 4, -1, -7, -32, 2, 8, 14, -16],
                           [4, 28, -7, -1, -32, 14, 8, 2, -16],
                           [-1, -7, 28, 4, 8, 14, -32, 2, -16],
@@ -459,16 +463,6 @@ class QuadraticRectElement(_LegendreElement2D):
                           [14, 2, 2, 14, -16, 16, -16, 112, -128],
                           [-16, -16, -16, -16, 32, -128, 32, -128, 256]], dtype=float)
 
-    _BpC = 1/18 * np.array([[9, 0, -1, 0, 0, 4, 4, 0, -16],
-                            [0, -9, 0, 1, 0, 0, -4, -4, 16],
-                            [-1, 0, 9, 0, 4, 0, 0, 4, -16],
-                            [0, 1, 0, -9, -4, -4, 0, 0, 16],
-                            [0, 0, 4, -4, 0, -16, 0, 16, 0],
-                            [4, 0, 0, -4, -16, 0, 16, 0, 0],
-                            [4, -4, 0, 0, 0, 16, 0, -16, 0],
-                            [0, -4, 4, 0, 16, 0, -16, 0, 0],
-                            [-16, 16, -16, 16, 0, 0, 0, 0, 0]], dtype= float)
-    
     _D   = 1/90*np.array([[28, -7, -1, 4, 14, 8, 2, -32, -16],
                           [-7, 28, 4, -1, 14, -32, 2, 8, -16],
                           [-1, 4, 28, -7, 2, -32, 14, 8, -16],
@@ -479,27 +473,26 @@ class QuadraticRectElement(_LegendreElement2D):
                           [-32, 8, 8, -32, -16, -16, -16, 64, 32],
                           [-16, -16, -16, -16, -128, 32, -128, 32, 256]], dtype=float)
     
-    _M = (1/225)*np.array([[16, -4, 1, -4, 8, -2, -2, 8, 4],
-                           [-4, 16, -4, 1, 8, 8, -2, -2, 4],
-                           [1, -4, 16, -4, -2, 8, 8, -2, 4],
-                           [-4, 1, -4, 16, -2, -2, 8, 8, 4],
-                           [8, 8, -2, -2, 64, 4, -16, 4, 32],
-                           [-2, 8, 8, -2, 4, 64, 4, -16, 32],
-                           [-2, -2, 8, 8, -16, 4, 64, 4, 32],
-                           [8, -2, -2, 8, 4, -16, 4, 64, 32],
-                           [4, 4, 4, 4, 32, 32, 32, 32, 25]], dtype = float)
-
+    _BpC = 1/18 * np.array([[9, 0, -1, 0, 0, 4, 4, 0, -16],
+                            [0, -9, 0, 1, 0, 0, -4, -4, 16],
+                            [-1, 0, 9, 0, 4, 0, 0, 4, -16],
+                            [0, 1, 0, -9, -4, -4, 0, 0, 16],
+                            [0, 0, 4, -4, 0, -16, 0, 16, 0],
+                            [4, 0, 0, -4, -16, 0, 16, 0, 0],
+                            [4, -4, 0, 0, 0, 16, 0, -16, 0],
+                            [0, -4, 4, 0, 16, 0, -16, 0, 0],
+                            [-16, 16, -16, 16, 0, 0, 0, 0, 0]], dtype= float)
     
     @staticmethod
     def basis_functions(xi, eta):
-        return np.array([0.25*(xi**2 - xi)(*eta**2 - eta),
+        return np.array([0.25*(xi**2 - xi)*(eta**2 - eta),
                          0.25*(xi**2 + xi)*(eta**2 - eta),
                          0.25*(xi**2 + xi)*(eta**2 + eta),
                          0.25*(xi**2 - xi)*(eta**2 + eta),
                          0.5*(1 - xi**2)*(eta**2 - eta),
                          0.5*(xi**2 + xi)*(1 - eta**2),
                          0.5*(1 - xi**2)*(eta**2 + eta),
-                         0.5*(xi**2 - xi)*(1 - xi**2),
+                         0.5*(xi**2 - xi)*(1 - eta**2),
                          (1 - xi**2)*(1-eta**2)], dtype = float)
     
     
@@ -509,10 +502,12 @@ class QuadraticRectElement(_LegendreElement2D):
                          [1/4*( 1 + 2*x)*(-1 + y)*y, 1/4*x*(1 + x)*(-1 + 2*y)],
                          [1/4*( 1 + 2*x)*(1 + y)*y,  1/4*x*(1 + x)*(1 + 2*y)],
                          [1/4*(-1 + 2*x)*(1 + y)*y,  1/4*x*(-1 + x)*(1 + 2*y)],
+                         
                          [-x*(-1 + y)*y, -(1/2)*(-1 + x**2)*(-1 + 2*y)],
                          [-(1/2)*(1 + 2*x)*(-1 + y**2), -x*(1 + x)*y],
                          [-x*y*(1 + y), -(1/2)*(-1 + x**2)*(1 + 2*y)],
                          [-(1/2)*(-1 + 2*x)*(-1 + y**2), -(-1 + x)*x*y],
+                         
                          [2*x*(-1 + y**2), 2*(-1 + x**2)*y]])
 
     @staticmethod
@@ -520,4 +515,13 @@ class QuadraticRectElement(_LegendreElement2D):
         x, w = np.polynomial.legendre.leggauss(n_points)
         X, Y = np.meshgrid(x, x)
         return np.vstack([X.ravel(), Y.ravel()]).T, np.outer(w,w).ravel()
+    
+    def compute_ele_properties(self, nodes):
+        J = nodes[:,:2].T@self.grad_basis_function(-1,-1)
+        a = nodes[1,0] - nodes[0,0] # width
+        b = nodes[2,1] - nodes[1,1] # height
+        if np.isclose(2*J[0,0], a) and np.isclose(2*J[1,1],b):
+            return a*b/4, np.diag([2/a, 2/b])
+        else:
+            raise ValueError("Rectangular element is not aligned with axis")
     

@@ -54,14 +54,14 @@ if __name__ == '__main__':
     # dt = 1e-6
     # time_integrator = '1si'
 
-    # # 1ST ORDER STABILIZED SI SCHEME
-    # dt = 1e-4
-    # time_integrator = '1ssi'
+    # 1ST ORDER STABILIZED SI SCHEME
+    dt = 1e-4
+    time_integrator = '1ssi'
 
     
-    # 2ND ORDER STABILIZED SI SCHEME
-    dt = 1e-4
-    time_integrator = '2ssi'
+    # # 2ND ORDER STABILIZED SI SCHEME
+    # dt = 1e-4
+    # time_integrator = '2ssi'
 
     # dt = 1e-6
 
@@ -78,8 +78,8 @@ if __name__ == '__main__':
     def c0(x,y): return np.cos(np.pi/a*x)*np.sin(np.pi/(b)*y)
 
 
-    n = 6
-    def c0(x,y): return np.cos(2*np.pi/(a)*n*x)*np.sin(2*np.pi/(b)*n*y)
+    # n = 6
+    # def c0(x,y): return np.cos(2*np.pi/(a)*n*x)*np.sin(2*np.pi/(b)*n*y)
     
 
     # np.random.default_rng(0)
@@ -92,22 +92,20 @@ if __name__ == '__main__':
     # Nonlinear solver
 
     
-    prepend = None
-    mesh_size = 0.02
-    sol = CahnHilliardSolver2D.rectangular_domain_tri(epsilon, a, b, mesh_size=mesh_size)
+    # prepend = None
+    # mesh_size = 0.02
+    # sol = CahnHilliardSolver2D.rectangular_domain_tri(epsilon, a, b, mesh_size=mesh_size)
 
     # prepend = "circular"
     # mesh_size = 0.02
     # sol = CahnHilliardSolver2D.generate_circular_mesh(epsilon, a, mesh_size=mesh_size)
 
-    # prepend = None
-    # nx = 10
-    # ny = 10
-    # order = 1
-    # sol = CahnHilliardSolver2D.rectangular_domain_rect(epsilon, a, b, nx, ny, order)
-    # sol.plot_mesh()
-
-    # plt.show()
+    prepend = None
+    nx = 20
+    ny = 20
+    order = 1
+    sol = CahnHilliardSolver2D.rectangular_domain_rect(epsilon, a, b, nx, ny, order)
+    
 
     sol.solve(c0, tEnd, dt, time_integrator=time_integrator,
               terminate_solver=False
@@ -136,8 +134,8 @@ if __name__ == '__main__':
     vmin = min(np.nanmin(sol.sol_c[-1]), -1.0)
     vmax = max(np.nanmax(sol.sol_c[-1]), 1.0)
         
-    tcf1, _ = sol.plot_solution(sol.sol_c[0],  ax= ax[0], vmin = vmin, vmax = vmax)
-    tcf2, _ = sol.plot_solution(sol.sol_c[-1], ax= ax[1], vmin = vmin, vmax = vmax)
+    tcf1, _ = sol.plot_solution(sol.sol_c[0],  ax= ax[0], vmin = vmin, vmax = vmax, plot_mesh=True)
+    tcf2, _ = sol.plot_solution(sol.sol_c[-1], ax= ax[1], vmin = vmin, vmax = vmax, plot_mesh=True)
     ax[0].set_title('Starting solution')
     ax[1].set_title('Ending solution')
     cbar = fig.colorbar(
